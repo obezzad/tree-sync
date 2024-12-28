@@ -1,16 +1,15 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 
 interface BulkAddModalProps {
   open: boolean;
   onClose: () => void;
+  selectedNodeId: string | null;
 }
 
-export const BulkAddModal = ({ open, onClose }: BulkAddModalProps) => {
-  if (!open) return null;
-
-  const handleClose = () => {
+export const BulkAddModal = ({ open, onClose, selectedNodeId }: BulkAddModalProps) => {
+  const handleClose = useCallback(() => {
     onClose();
-  };
+  }, [onClose]);
 
   useEffect(() => {
     const handleKeyboard = (e: KeyboardEvent) => {
@@ -25,7 +24,9 @@ export const BulkAddModal = ({ open, onClose }: BulkAddModalProps) => {
 
     document.addEventListener('keydown', handleKeyboard);
     return () => document.removeEventListener('keydown', handleKeyboard);
-  }, [open]);
+  }, [open, handleClose]);
+
+  if (!open) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

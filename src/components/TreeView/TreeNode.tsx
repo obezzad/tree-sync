@@ -3,8 +3,6 @@
 import { useState, useEffect } from 'react';
 import { ChevronRight, ChevronDown, Plus, Trash2, GripVertical, Database } from 'lucide-react';
 import type { Node } from '@/library/powersync/NodeService';
-import { BulkAddModal } from './BulkAddModal';
-
 interface TreeNodeData extends Node {
   children: TreeNodeData[];
 }
@@ -15,7 +13,7 @@ interface TreeNodeProps {
   onAddChild: (parentId: string) => void;
   onDelete: (nodeId: string) => void;
   onMove?: (sourceId: string, targetId: string, position: 'before' | 'after' | 'inside') => void;
-  onBulkAdd: (parentId: string, numNodes: number, maxDepth: number) => void;
+  onBulkAdd: (nodeId: string) => void;
   readOnly?: boolean;
   isExpanded?: boolean;
   onToggleExpand?: (nodeId: string) => void;
@@ -34,14 +32,9 @@ export const TreeNode = ({
 }: TreeNodeProps) => {
   const [isHovered, setIsHovered] = useState(false);
   const [dragOverPosition, setDragOverPosition] = useState<'before' | 'after' | 'inside' | null>(null);
-  const [isBulkAddModalOpen, setIsBulkAddModalOpen] = useState(false);
   const payload = JSON.parse(node.payload ?? '{}');
   const hasChildren = node.children.length > 0;
   const isRoot = level === 0;
-
-  const handleBulkAdd = (numNodes: number, maxDepth: number) => {
-    onBulkAdd(node.id, numNodes, maxDepth);
-  };
 
   const handleDragStart = (e: React.DragEvent) => {
     if (readOnly) return;
@@ -187,7 +180,7 @@ export const TreeNode = ({
               </button>
               <button
                 className="p-1 hover:bg-gray-100 rounded"
-                onClick={() => setIsBulkAddModalOpen(true)}
+                onClick={() => onBulkAdd(node.id)}
                 title="Bulk add subtree"
               >
                 <Database className="w-4 h-4 text-gray-500" />
@@ -204,11 +197,6 @@ export const TreeNode = ({
           )}
         </div>
       </div>
-
-      <BulkAddModal
-        open={isBulkAddModalOpen}
-        onClose={() => setIsBulkAddModalOpen(false)}
-      />
     </div>
   );
 };

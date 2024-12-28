@@ -6,6 +6,7 @@ import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import toast from 'react-hot-toast';
 import { TreeNode } from './TreeNode';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { BulkAddModal } from './BulkAddModal';
 import { NodeService } from '@/library/powersync/NodeService';
 import type { Node } from '@/library/powersync/NodeService';
 import { treeUtils } from '@/utils/treeUtils';
@@ -27,6 +28,8 @@ const MemoizedTreeNode = memo(TreeNode);
 export const TreeView = ({ nodes, nodeService, readOnly = false }: TreeViewProps) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [nodeToDelete, setNodeToDelete] = useState<string | null>(null);
+  const [isBulkAddModalOpen, setIsBulkAddModalOpen] = useState(false);
+  const [selectedNodeForBulk, setSelectedNodeForBulk] = useState<string | null>(null);
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
 
   const treeData = useMemo(() => {
@@ -128,8 +131,14 @@ export const TreeView = ({ nodes, nodeService, readOnly = false }: TreeViewProps
     await nodeService.createNode(node);
   }, [readOnly, nodeService]);
 
-  const handleBulkAdd = useCallback(async (parentId: string | null, count: number, depth: number) => {
-    return; // HACK: Disable bulk add for now
+  const handleBulkAdd = useCallback((nodeId: string) => {
+    setSelectedNodeForBulk(nodeId);
+    setIsBulkAddModalOpen(true);
+  }, []);
+
+  const handleCloseBulkModal = useCallback(() => {
+    setIsBulkAddModalOpen(false);
+    setSelectedNodeForBulk(null);
   }, []);
 
   const handleDeleteNode = useCallback(async (nodeId: string) => {
@@ -235,6 +244,13 @@ export const TreeView = ({ nodes, nodeService, readOnly = false }: TreeViewProps
           </div>
         )}
       </div>
+
+      {/* Bulk Add Modal */}
+      <BulkAddModal
+        open={isBulkAddModalOpen}
+        onClose={handleCloseBulkModal}
+        selectedNodeId={selectedNodeForBulk}
+      />
     </ErrorBoundary>
   );
 };
