@@ -27,7 +27,6 @@ export interface TreeNodeProps {
   onMove: (sourceId: string, targetId: string, position: NodePosition) => Promise<void>;
   onBulkAdd: (parentId: string | null, numNodes: number, depth: number) => Promise<void>;
   readOnly: boolean;
-  globalExpanded: boolean;
 }
 
 export interface NodeService {

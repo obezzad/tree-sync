@@ -1,9 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback, memo } from 'react';
+import { AutoSizer, List } from 'react-virtualized';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import toast from 'react-hot-toast';
 import { TreeNode } from './TreeNode';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { BulkAddModal } from './BulkAddModal';
 import { NodeService } from '@/library/powersync/NodeService';
 import type { Node } from '@/library/powersync/NodeService';
 import { treeUtils } from '@/utils/treeUtils';
@@ -18,41 +21,76 @@ interface TreeViewProps {
   readOnly?: boolean;
 }
 
+const ROW_HEIGHT = 48; // 40px height + 8px margin
+
+const MemoizedTreeNode = memo(TreeNode);
+
 export const TreeView = ({ nodes, nodeService, readOnly = false }: TreeViewProps) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [nodeToDelete, setNodeToDelete] = useState<string | null>(null);
-  const [globalExpanded, setGlobalExpanded] = useState(false);
+  const [isBulkAddModalOpen, setIsBulkAddModalOpen] = useState(false);
+  const [selectedNodeForBulk, setSelectedNodeForBulk] = useState<string | null>(null);
+  const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
 
   const treeData = useMemo(() => {
-    const buildTree = (nodes: Node[], parentId: string | null = null): TreeNodeData[] => {
-      return nodes
-        .filter(node => node.parent_id === parentId)
-        .map(node => ({
-          ...node,
-          children: buildTree(nodes, node.id)
-        }));
+    const nodeMap = new Map<string | null, Node[]>();
+
+    nodes.forEach(node => {
+      const parentId = node.parent_id;
+      if (!nodeMap.has(parentId)) {
+        nodeMap.set(parentId, []);
+      }
+      nodeMap.get(parentId)!.push(node);
+    });
+
+    const buildTree = (parentId: string | null): TreeNodeData[] => {
+      const children = nodeMap.get(parentId) || [];
+      return children.map(node => ({
+        ...node,
+        children: buildTree(node.id)
+      }));
     };
 
-    return buildTree(nodes, null);
+    return buildTree(null);
   }, [nodes]);
 
-  // Helper function to check if a node is in a subtree
-  const isNodeInSubtree = (nodeId: string, subtreeRoot: TreeNodeData): boolean => {
+  const collapsedNodesMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    nodes.forEach(node => {
+      map.set(node.id, collapsedNodes.has(node.id));
+    });
+    return map;
+  }, [nodes, collapsedNodes]);
+
+  const flattenedNodes = useMemo(() => {
+    const flattened: Array<{ node: TreeNodeData; level: number }> = [];
+    const flatten = (nodes: TreeNodeData[], level: number) => {
+      nodes.forEach(node => {
+        flattened.push({ node, level });
+        if (!collapsedNodesMap.get(node.id) && node.children.length > 0) {
+          flatten(node.children, level + 1);
+        }
+      });
+    };
+    flatten(treeData, 1);
+    return flattened;
+  }, [treeData, collapsedNodesMap]);
+
+  const isNodeInSubtree = useCallback((nodeId: string, subtreeRoot: TreeNodeData): boolean => {
     if (subtreeRoot.id === nodeId) return true;
     return subtreeRoot.children.some(child => isNodeInSubtree(nodeId, child));
-  };
+  }, []);
 
-  // Find node by ID in the tree
-  const findNode = (nodeId: string, tree: TreeNodeData[]): TreeNodeData | null => {
+  const findNode = useCallback((nodeId: string, tree: TreeNodeData[]): TreeNodeData | null => {
     for (const node of tree) {
       if (node.id === nodeId) return node;
       const found = findNode(nodeId, node.children);
       if (found) return found;
     }
     return null;
-  };
+  }, []);
 
-  const handleMove = async (sourceId: string, targetId: string, position: 'before' | 'after' | 'inside') => {
+  const handleMove = useCallback(async (sourceId: string, targetId: string, position: 'before' | 'after' | 'inside') => {
     if (readOnly) return;
 
     const sourceNode = findNode(sourceId, treeData);
@@ -80,9 +118,9 @@ export const TreeView = ({ nodes, nodeService, readOnly = false }: TreeViewProps
       console.error('Failed to move node:', error);
       toast.error(error.message ?? 'Failed to move node');
     }
-  };
+  }, [readOnly, treeData, nodeService, findNode, isNodeInSubtree]);
 
-  const handleAddNode = async (parentId: string | null) => {
+  const handleAddNode = useCallback(async (parentId: string | null) => {
     if (readOnly) return;
 
     const node = {
@@ -91,98 +129,126 @@ export const TreeView = ({ nodes, nodeService, readOnly = false }: TreeViewProps
     };
 
     await nodeService.createNode(node);
-  };
+  }, [readOnly, nodeService]);
 
-  const handleBulkAdd = async (parentId: string | null, count: number, depth: number) => {
-    return; // HACK: Disable bulk add for now
-  };
+  const handleBulkAdd = useCallback((nodeId: string) => {
+    setSelectedNodeForBulk(nodeId);
+    setIsBulkAddModalOpen(true);
+  }, []);
 
-  const handleDeleteNode = async (nodeId: string) => {
+  const handleCloseBulkModal = useCallback(() => {
+    setIsBulkAddModalOpen(false);
+    setSelectedNodeForBulk(null);
+  }, []);
+
+  const handleDeleteNode = useCallback(async (nodeId: string) => {
     if (readOnly) return;
     setNodeToDelete(nodeId);
     setShowDeleteConfirm(true);
-  };
+  }, [readOnly]);
 
-  const confirmDelete = async () => {
+  const confirmDelete = useCallback(async () => {
     setShowDeleteConfirm(false);
     setNodeToDelete(null);
     if (nodeToDelete) {
       await nodeService.deleteNode(nodeToDelete);
     }
-  };
+  }, [nodeToDelete, nodeService]);
+
+  const handleToggleExpand = useCallback((nodeId: string) => {
+    setCollapsedNodes(prev => {
+      const next = new Set(prev);
+      if (!next.has(nodeId)) {
+        next.add(nodeId);
+      } else {
+        next.delete(nodeId);
+      }
+      return next;
+    });
+  }, []);
 
   return (
-    <div className="w-full max-w-3xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200">
-      <div className="p-2 border-b flex justify-end gap-2">
-        <button
-          className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-800 bg-gray-100 rounded"
-          onClick={() => setGlobalExpanded(!globalExpanded)}
-        >
-          {globalExpanded ? (
-            <>
-              <ChevronDown className="w-4 h-4" />
-              Collapse All
-            </>
+    <ErrorBoundary>
+      <div className="w-full max-w-3xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="overflow-x-auto" style={{ height: '40vh' }}>
+          {nodes.length === 0 ? (
+            <div className="text-center text-gray-500 p-4">
+              <div className="mb-4">No nodes available</div>
+            </div>
           ) : (
-            <>
-              <ChevronRight className="w-4 h-4" />
-              Expand All
-            </>
+            <AutoSizer>
+              {({ width, height }) => (
+                <List
+                  width={width}
+                  height={height}
+                  rowCount={flattenedNodes.length}
+                  rowHeight={ROW_HEIGHT}
+                  overscanRowCount={20}
+                  rowRenderer={({ index, key, style }) => {
+                    const { node, level } = flattenedNodes[index];
+                    return (
+                      <div
+                        key={key}
+                        style={{
+                          ...style,
+                        }}
+                        className="flex items-center"
+                      >
+                        <MemoizedTreeNode
+                          node={node}
+                          level={level}
+                          onAddChild={handleAddNode}
+                          onDelete={handleDeleteNode}
+                          onMove={handleMove}
+                          onBulkAdd={handleBulkAdd}
+                          readOnly={readOnly}
+                          isExpanded={!collapsedNodesMap.get(node.id)}
+                          onToggleExpand={handleToggleExpand}
+                        />
+                      </div>
+                    );
+                  }}
+                />
+              )}
+            </AutoSizer>
           )}
-        </button>
-      </div>
+        </div>
 
-      <div className="overflow-x-auto">
-        {nodes.length === 0 ? (
-          <div className="text-center text-gray-500 p-4">
-            <div className="mb-4">No nodes available</div>
-          </div>
-        ) : (
-          <div className="min-w-max">
-            {treeData.map((node) => (
-              <TreeNode
-                key={node.id}
-                node={node}
-                level={1}
-                onAddChild={handleAddNode}
-                onDelete={handleDeleteNode}
-                onMove={handleMove}
-                onBulkAdd={handleBulkAdd}
-                readOnly={readOnly}
-                globalExpanded={globalExpanded}
-              />
-            ))}
+        {/* Delete Confirmation Dialog */}
+        {showDeleteConfirm && nodeToDelete && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full mx-4">
+              <h3 className="text-lg font-semibold mb-4">Delete Node</h3>
+              <p className="mb-4">Are you sure you want to delete this node and all its children?</p>
+              <div className="flex justify-end gap-2">
+                <button
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 bg-gray-100 rounded"
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    setNodeToDelete(null);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                  onClick={confirmDelete}
+                  autoFocus
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Delete Confirmation Dialog */}
-      {showDeleteConfirm && nodeToDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Delete Node</h3>
-            <p className="mb-4">Are you sure you want to delete this node and all its children?</p>
-            <div className="flex justify-end gap-2">
-              <button
-                className="px-4 py-2 text-gray-600 hover:text-gray-800 bg-gray-100 rounded"
-                onClick={() => {
-                  setShowDeleteConfirm(false);
-                  setNodeToDelete(null);
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-                onClick={confirmDelete}
-                autoFocus
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      {/* Bulk Add Modal */}
+      <BulkAddModal
+        open={isBulkAddModalOpen}
+        onClose={handleCloseBulkModal}
+        selectedNodeId={selectedNodeForBulk}
+      />
+    </ErrorBoundary>
   );
 };

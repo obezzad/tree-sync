@@ -3,8 +3,6 @@
 import { useState, useEffect } from 'react';
 import { ChevronRight, ChevronDown, Plus, Trash2, GripVertical, Database } from 'lucide-react';
 import type { Node } from '@/library/powersync/NodeService';
-import { BulkAddModal } from './BulkAddModal';
-
 interface TreeNodeData extends Node {
   children: TreeNodeData[];
 }
@@ -15,9 +13,10 @@ interface TreeNodeProps {
   onAddChild: (parentId: string) => void;
   onDelete: (nodeId: string) => void;
   onMove?: (sourceId: string, targetId: string, position: 'before' | 'after' | 'inside') => void;
-  onBulkAdd: (parentId: string, numNodes: number, maxDepth: number) => void;
+  onBulkAdd: (nodeId: string) => void;
   readOnly?: boolean;
-  globalExpanded?: boolean;
+  isExpanded?: boolean;
+  onToggleExpand?: (nodeId: string) => void;
 }
 
 export const TreeNode = ({
@@ -28,24 +27,14 @@ export const TreeNode = ({
   onMove,
   onBulkAdd,
   readOnly = false,
-  globalExpanded = true
+  isExpanded = true,
+  onToggleExpand
 }: TreeNodeProps) => {
-  const [localExpanded, setLocalExpanded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [dragOverPosition, setDragOverPosition] = useState<'before' | 'after' | 'inside' | null>(null);
-  const [isBulkAddModalOpen, setIsBulkAddModalOpen] = useState(false);
   const payload = JSON.parse(node.payload ?? '{}');
   const hasChildren = node.children.length > 0;
   const isRoot = level === 0;
-
-  // Update localExpanded when globalExpanded changes
-  useEffect(() => {
-    setLocalExpanded(globalExpanded);
-  }, [globalExpanded]);
-
-  const handleBulkAdd = (numNodes: number, maxDepth: number) => {
-    onBulkAdd(node.id, numNodes, maxDepth);
-  };
 
   const handleDragStart = (e: React.DragEvent) => {
     if (readOnly) return;
@@ -123,22 +112,25 @@ export const TreeNode = ({
     }
   };
 
-  const nodeName = level === 1 ? 'ROOT' : payload.name ?? `Unnamed Node ${node.id}`
+  const nodeName = level === 1 ? 'ROOT' : payload.name ?? `Unnamed Node ${node.id}`;
 
   return (
-    <div className="select-none">
+    <div className="select-none w-full h-full">
       <div
         className={[
           'hover:bg-gray-50',
           'rounded',
           'transition-colors',
-          'whitespace-nowrap',
+          'w-full',
+          'h-full',
+          'flex',
+          'items-center',
           !isRoot ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
           'relative',
           node._is_pending ? 'bg-yellow-100' : '',
           getDropIndicatorStyle(),
         ].join(' ')}
-        onClick={() => hasChildren && setLocalExpanded(!localExpanded)}
+        onClick={() => hasChildren && onToggleExpand?.(node.id)}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         draggable={!readOnly && !isRoot}
@@ -147,7 +139,7 @@ export const TreeNode = ({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <div className="flex items-center p-2">
+        <div className="flex items-center min-h-[40px] px-2">
           <div style={{ width: `${level * 1.5}rem` }} className="flex-shrink-0" />
           {!readOnly && !isRoot && (
             <div
@@ -159,30 +151,24 @@ export const TreeNode = ({
           )}
           <div className="w-6 flex-shrink-0 flex items-center">
             {hasChildren ? (
-              localExpanded ? (
+              isExpanded ? (
                 <ChevronDown className="w-4 h-4 text-gray-500" />
               ) : (
                 <ChevronRight className="w-4 h-4 text-gray-500" />
               )
             ) : null}
           </div>
-          <div className="flex-1">
-            <div className="font-medium text-gray-900">
+          <div className="flex-1 grow truncate">
+            <div className="font-medium text-gray-900 truncate">
               {nodeName}
             </div>
-            <div className="text-sm text-gray-500">
-              {Object.entries({ ...node, children: null })
-                .filter(([_, v]) => v)
-                .map(([key, value]) => (
-                  <div key={key}>
-                    <span className='font-medium'>{key}</span>: {String(value)}
-                  </div>
-                ))}
+            <div className="text-xs text-gray-500 truncate">
+              {node.id}
             </div>
           </div>
           {isHovered && !readOnly && (
             <div
-              className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-2"
+              className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-2 bg-white/80 backdrop-blur-sm py-1 px-2 rounded"
               onClick={(e) => e.stopPropagation()}
             >
               <button
@@ -194,7 +180,7 @@ export const TreeNode = ({
               </button>
               <button
                 className="p-1 hover:bg-gray-100 rounded"
-                onClick={() => setIsBulkAddModalOpen(true)}
+                onClick={() => onBulkAdd(node.id)}
                 title="Bulk add subtree"
               >
                 <Database className="w-4 h-4 text-gray-500" />
@@ -211,29 +197,6 @@ export const TreeNode = ({
           )}
         </div>
       </div>
-
-      {localExpanded && hasChildren && (
-        <div>
-          {node.children.map((child) => (
-            <TreeNode
-              key={child.id}
-              node={child}
-              level={level + 1}
-              onAddChild={onAddChild}
-              onDelete={onDelete}
-              onMove={onMove}
-              onBulkAdd={onBulkAdd}
-              readOnly={readOnly}
-              globalExpanded={globalExpanded}
-            />
-          ))}
-        </div>
-      )}
-
-      <BulkAddModal
-        open={isBulkAddModalOpen}
-        onClose={() => setIsBulkAddModalOpen(false)}
-      />
     </div>
   );
 };
