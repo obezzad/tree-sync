@@ -170,6 +170,46 @@ export const TreeView = ({ nodes, nodeService, readOnly = false }: TreeViewProps
   return (
     <ErrorBoundary>
       <div className="w-full max-w-3xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="p-2 border-b border-gray-200 flex justify-end">
+          <button
+            onClick={() => {
+              if (collapsedNodes.size === 0) {
+                const batchSize = 10000;
+                const newCollapsed = new Set<string>();
+
+                const processChunk = (startIndex: number) => {
+                  const endIndex = Math.min(startIndex + batchSize, nodes.length);
+                  for (let i = startIndex; i < endIndex; i++) {
+                    newCollapsed.add(nodes[i].id);
+                  }
+
+                  if (endIndex < nodes.length) {
+                    requestAnimationFrame(() => processChunk(endIndex));
+                  } else {
+                    setCollapsedNodes(newCollapsed);
+                  }
+                };
+
+                requestAnimationFrame(() => processChunk(0));
+              } else {
+                setCollapsedNodes(new Set());
+              }
+            }}
+            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 bg-gray-100 rounded flex items-center gap-1"
+          >
+            {collapsedNodes.size === 0 ? (
+              <>
+                <ChevronDown className="w-4 h-4" />
+                Collapse All
+              </>
+            ) : (
+              <>
+                <ChevronRight className="w-4 h-4" />
+                Expand All
+              </>
+            )}
+          </button>
+        </div>
         <div className="overflow-x-auto" style={{ height: '40vh' }}>
           {nodes.length === 0 ? (
             <div className="text-center text-gray-500 p-4">
