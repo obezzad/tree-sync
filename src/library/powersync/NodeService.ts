@@ -21,13 +21,14 @@ export class NodeService {
       name: 'create_node',
       args: { ...data, id: node_id },
       optimisticUpdate: async (tx: Transaction) => {
-        await tx.execute(
+        const insertResult = await tx.execute(
           `INSERT INTO nodes (id, created_at, payload, user_id, parent_id, _is_pending)
-           VALUES (?, current_timestamp, ?, ?, ?, 1)`,
+           VALUES (?, current_timestamp, ?, ?, ?, 1)
+           RETURNING id`,
           [node_id, data.payload ?? '{}', user_id, data.parent_id]
         );
 
-        return true;
+        return insertResult.rows?._array.map(row => row.id) ?? [];
       }
     });
   }
@@ -40,7 +41,7 @@ export class NodeService {
         new_parent_id: newParentId
       },
       optimisticUpdate: async (tx: Transaction) => {
-        await tx.execute(`
+        const updateResult = await tx.execute(`
           WITH RECURSIVE ancestors AS (
             -- Base: start with the proposed new parent
             SELECT id, parent_id
@@ -60,29 +61,33 @@ export class NodeService {
           AND (
             ? IS NULL  -- Allow moving to root
             OR ? NOT IN (SELECT id FROM ancestors)  -- Check ancestors if not moving to root
-        );`, [newParentId, newParentId, newParentId, nodeId, newParentId, nodeId]);
+        )
+          RETURNING id;`, [newParentId, newParentId, newParentId, nodeId, newParentId, nodeId]);
 
-        return true;
+        return updateResult.rows?._array.map(row => row.id) ?? [];
       }
     });
   }
 
   async deleteNode(node_id: string) {
+    const isRoot = node_id === uuidv5("ROOT_NODE", userService.getUserId());
+
     await this.mutationStore.mutate({
       name: 'delete_node',
       args: { node_id },
       optimisticUpdate: async (tx: Transaction) => {
         // HACK: Archive only the parent node
-        await tx.execute(`
+        const updateResult = await tx.execute(`
           UPDATE nodes
           SET archived_at = CURRENT_TIMESTAMP
           WHERE CASE
               WHEN ? THEN parent_id = ?
               ELSE id = ?
           END
-          AND archived_at IS NULL;`, [node_id === uuidv5("ROOT_NODE", userService.getUserId()), node_id, node_id]);
+          AND archived_at IS NULL
+          RETURNING id;`, [isRoot, node_id, node_id]);
 
-        return true;
+        return updateResult.rows?._array.map(row => row.id) ?? [];
       }
     });
   }
