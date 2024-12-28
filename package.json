@@ -21,6 +21,7 @@
     "@powersync/react": "^1.5.1",
     "@powersync/web": "^1.12.0",
     "@supabase/supabase-js": "^2.46.2",
+    "@types/react-virtualized": "^9.22.0",
     "@types/uuid": "^10.0.0",
     "humanize-duration": "^3.32.1",
     "js-logger": "^1.6.1",
@@ -33,6 +34,7 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-hot-toast": "^2.4.1",
+    "react-virtualized": "^9.22.5",
     "uuid": "^11.0.3"
   },
   "devDependencies": {
