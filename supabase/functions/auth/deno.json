@@ -1,0 +1,15 @@
+{
+  "tasks": {
+    "serve": "deno run --allow-net --allow-env index.ts"
+  },
+  "compilerOptions": {
+    "allowJs": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "lib": ["deno.window", "dom"],
+    "types": [
+      "https://deno.land/std@0.177.0/http/server.ts",
+      "https://raw.githubusercontent.com/supabase/supabase-js/v2.21.0/dist/module/index.d.ts"
+    ]
+  }
+}

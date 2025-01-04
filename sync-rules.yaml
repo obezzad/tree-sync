@@ -1,0 +1,7 @@
+bucket_definitions:
+  # User's own nodes; using local_id metadata for testing purposes
+  user_nodes:
+    parameters:
+        - SELECT request.jwt() ->> 'user_metadata.local_id' as local_user_id
+    data:
+        - SELECT * FROM nodes WHERE user_id = bucket.local_user_id
