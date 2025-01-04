@@ -118,7 +118,6 @@ export const TreeNode = ({
     <div className="select-none w-full h-full">
       <div
         className={[
-          'hover:bg-gray-50',
           'rounded',
           'transition-colors',
           'w-full',
@@ -127,7 +126,8 @@ export const TreeNode = ({
           'items-center',
           !isRoot ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
           'relative',
-          node._is_pending ? 'bg-yellow-100' : '',
+          node._is_pending ? 'bg-yellow-100' :
+          node.archived_at ? 'bg-gray-50' : 'hover:bg-gray-50',
           getDropIndicatorStyle(),
         ].join(' ')}
         onClick={() => hasChildren && onToggleExpand?.(node.id)}
@@ -159,7 +159,7 @@ export const TreeNode = ({
             ) : null}
           </div>
           <div className="flex-1 grow truncate">
-            <div className="font-medium text-gray-900 truncate">
+            <div className={`font-medium truncate ${node.archived_at ? 'text-gray-400' : 'text-gray-900'}`}>
               {nodeName}
             </div>
             <div className="text-xs text-gray-500 truncate">

@@ -5,11 +5,13 @@ import { AutoSizer, List } from 'react-virtualized';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import toast from 'react-hot-toast';
 import { TreeNode } from './TreeNode';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Archive } from 'lucide-react';
 import { BulkAddModal } from './BulkAddModal';
 import { NodeService } from '@/library/powersync/NodeService';
 import type { Node } from '@/library/powersync/NodeService';
 import { treeUtils } from '@/utils/treeUtils';
+import { initializeStore } from '@/stores/RootStore';
+import { observer } from 'mobx-react-lite';
 
 interface TreeNodeData extends Node {
   children: TreeNodeData[];
@@ -25,7 +27,8 @@ const ROW_HEIGHT = 48; // 40px height + 8px margin
 
 const MemoizedTreeNode = memo(TreeNode);
 
-export const TreeView = ({ nodes, nodeService, readOnly = false }: TreeViewProps) => {
+export const TreeView = observer(({ nodes, nodeService, readOnly = false }: TreeViewProps) => {
+  const rootStore = initializeStore();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [nodeToDelete, setNodeToDelete] = useState<string | null>(null);
   const [isBulkAddModalOpen, setIsBulkAddModalOpen] = useState(false);
@@ -170,7 +173,14 @@ export const TreeView = ({ nodes, nodeService, readOnly = false }: TreeViewProps
   return (
     <ErrorBoundary>
       <div className="w-full max-w-3xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="p-2 border-b border-gray-200 flex justify-end">
+        <div className="p-2 border-b border-gray-200 flex justify-end gap-2">
+          <button
+            onClick={() => rootStore.setShowArchivedNodes(!rootStore.showArchivedNodes)}
+            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 bg-gray-100 rounded flex items-center gap-1"
+          >
+            <Archive className="w-4 h-4" />
+            {rootStore.showArchivedNodes ? 'Hide Archived' : 'Show Archived'}
+          </button>
           <button
             onClick={() => {
               if (collapsedNodes.size === 0) {
@@ -291,4 +301,4 @@ export const TreeView = ({ nodes, nodeService, readOnly = false }: TreeViewProps
       />
     </ErrorBoundary>
   );
-};
+});

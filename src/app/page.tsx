@@ -8,8 +8,9 @@ import { useQuery, useStatus } from '@powersync/react';
 import { AbstractPowerSyncDatabase } from '@powersync/web';
 import { initializeStore } from '@/stores/RootStore';
 import { initializeAuthStore } from '@/stores/AuthStore';
+import { observer } from 'mobx-react-lite';
 
-export default function Home() {
+const Home = observer(() => {
   const db = usePowerSync();
 
   if (!db) throw new Error('PowerSync context not found');
@@ -22,7 +23,7 @@ export default function Home() {
 
   const { data: allNodes } = useQuery('SELECT count(id) as count FROM nodes');
   const { data: userNodes } = useQuery('SELECT count(id) as count FROM nodes WHERE user_id = ?', [local_id]);
-  const { data: nodes } = useQuery('SELECT * FROM nodes WHERE user_id = ? AND archived_at IS NULL ORDER BY created_at', [local_id]);
+  const { data: nodes } = useQuery(`SELECT * FROM nodes WHERE user_id = ? ${store.showArchivedNodes ? '' : 'AND archived_at IS NULL'} ORDER BY created_at DESC`, [local_id]);
   const { data: buckets } = useQuery(`SELECT count(DISTINCT bucket) as bucket_count FROM ps_oplog`);
   const { data: downloadedOps } = useQuery('select count() as count from ps_oplog');
   const { data: pendingUpload } = useQuery('select count(distinct tx_id) as count from ps_crud');
@@ -73,4 +74,6 @@ export default function Home() {
       />
     </main>
   );
-}
+});
+
+export default Home;

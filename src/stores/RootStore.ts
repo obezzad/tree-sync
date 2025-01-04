@@ -10,7 +10,8 @@ const STORAGE_KEYS = {
   SEED: 'tree-sync-seed',
   SESSION: 'tree-sync-session',
   STATE: 'tree-sync-state',
-  OFFLINE_MODE: 'tree-sync-offline-mode'
+  OFFLINE_MODE: 'tree-sync-offline-mode',
+  SHOW_ARCHIVED: 'tree-sync-show-archived'
 } as const;
 
 interface PersistedState {
@@ -18,6 +19,7 @@ interface PersistedState {
   isAuthReady: boolean;
   isInitializing: boolean;
   isOfflineMode: boolean;
+  showArchivedNodes: boolean;
 }
 
 export class RootStore {
@@ -28,6 +30,7 @@ export class RootStore {
   isPowerSyncReady = false;
   isAuthReady = false;
   isOfflineMode = false;
+  showArchivedNodes = true;
 
   constructor() {
     makeAutoObservable(this);
@@ -55,6 +58,13 @@ export class RootStore {
       });
     }
 
+    const storedShowArchived = localStorage.getItem(STORAGE_KEYS.SHOW_ARCHIVED);
+    if (storedShowArchived) {
+      runInAction(() => {
+        this.showArchivedNodes = storedShowArchived === 'true';
+      });
+    }
+
     this.restoreSession();
   }
 
@@ -75,7 +85,8 @@ export class RootStore {
       isPowerSyncReady: this.isPowerSyncReady,
       isAuthReady: this.isAuthReady,
       isInitializing: this.isInitializing,
-      isOfflineMode: this.isOfflineMode
+      isOfflineMode: this.isOfflineMode,
+      showArchivedNodes: this.showArchivedNodes
     };
 
     localStorage.setItem(STORAGE_KEYS.STATE, JSON.stringify(state));
@@ -91,6 +102,7 @@ export class RootStore {
           this.isAuthReady = state.isAuthReady;
           this.isInitializing = state.isInitializing;
           this.isOfflineMode = state.isOfflineMode;
+          this.showArchivedNodes = state.showArchivedNodes;
         });
       }
     } catch (error) {
@@ -162,6 +174,14 @@ export class RootStore {
         await this.logout();
       }
     }
+  }
+
+  setShowArchivedNodes(show: boolean) {
+    runInAction(() => {
+      this.showArchivedNodes = show;
+      localStorage.setItem(STORAGE_KEYS.SHOW_ARCHIVED, show.toString());
+      this.persistState();
+    });
   }
 
   setOfflineMode(enabled: boolean) {
