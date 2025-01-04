@@ -5,9 +5,8 @@ bucket_definitions:
     data:
         - SELECT * FROM nodes WHERE user_id = bucket.local_user_id
   selected_nodes_parent:
-    # Access control for parent, not self
     parameters:
-        - SELECT parent_id FROM nodes WHERE id = (request.parameters() ->> 'selected_node') AND user_id = (request.jwt() ->> 'user_metadata.local_id')
+        - SELECT parent_id FROM nodes WHERE id IN (request.parameters() ->> 'selected_node') AND user_id = (request.jwt() ->> 'user_metadata.local_id')
     data:
         - SELECT * FROM nodes WHERE id = bucket.parent_id
         - SELECT * FROM nodes WHERE parent_id = bucket.parent_id
@@ -19,7 +18,7 @@ bucket_definitions:
         - SELECT * FROM nodes WHERE id = bucket.node_id
         - SELECT * FROM nodes WHERE parent_id = bucket.node_id
 #  selected_nodes_grandchildren:
-#    parameters:
+#    parameters:    
 #        - SELECT id as node_id FROM nodes WHERE parent_id = (request.parameters() ->> 'selected_node') AND user_id = (request.jwt() ->> 'user_metadata.local_id')
 #    data:
 #        - SELECT * FROM nodes WHERE id = bucket.node_id
