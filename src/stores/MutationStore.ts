@@ -31,7 +31,7 @@ export class MutationStore {
       await tx.execute(
         `INSERT INTO mutations (id, name, args, created_at)
          VALUES (uuid(), ?, ?, current_timestamp)`,
-        [ config.name, JSON.stringify(config.args) ]
+        [config.name, JSON.stringify(config.args)]
       );
     });
 

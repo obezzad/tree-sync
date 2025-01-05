@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { observer } from 'mobx-react-lite';
-import { initializeStore } from '@/stores/RootStore';
+import store from '@/stores/RootStore';
 
 type AuthContextType = {
   isAuthenticated: boolean;
@@ -20,7 +20,6 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const AuthProvider = observer(({ children }: { children: React.ReactNode }) => {
-  const store = initializeStore();
   const router = useRouter();
   const pathname = usePathname();
   const isLoginPage = pathname === '/login';

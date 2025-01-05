@@ -1,16 +1,18 @@
-import { makeAutoObservable, runInAction } from 'mobx';
+import { autorun, makeAutoObservable, reaction, runInAction } from 'mobx';
 import { PowerSyncDatabase } from '@powersync/web';
 import { AppSchema } from '@/library/powersync/AppSchema';
-import { BackendConnector } from '@/library/powersync/BackendConnector';
+import backendConnector from '@/library/powersync/BackendConnector';
 import { authService } from '@/library/auth/authService';
 import { userService } from '@/library/powersync/userService';
 import type { Session } from '@/library/auth/types';
+import { v5 as uuidv5 } from 'uuid';
 
 const STORAGE_KEYS = {
   SEED: 'tree-sync-seed',
   SESSION: 'tree-sync-session',
   STATE: 'tree-sync-state',
   OFFLINE_MODE: 'tree-sync-offline-mode',
+  PARTIAL_SYNC: 'tree-sync-partial-sync',
   SHOW_ARCHIVED: 'tree-sync-show-archived'
 } as const;
 
@@ -19,24 +21,59 @@ interface PersistedState {
   isAuthReady: boolean;
   isInitializing: boolean;
   isOfflineMode: boolean;
+  isPartialSync: boolean;
   showArchivedNodes: boolean;
+  _syncedNodes?: string[];
 }
 
 export class RootStore {
-  private powerSync: PowerSyncDatabase | null = null;
+  private partialDb: PowerSyncDatabase | null = null;
+  private fullDb: PowerSyncDatabase | null = null;
   seed: string | null = null;
   session: Session | null = null;
   isInitializing = false;
   isPowerSyncReady = false;
   isAuthReady = false;
   isOfflineMode = false;
+  isPartialSync = true;
   showArchivedNodes = true;
+  selectedNodeId: string | null = null;
+  _syncedNodes: string[] = [];
 
   constructor() {
     makeAutoObservable(this);
+
     if (typeof window !== 'undefined') {
       this.initialize();
     }
+
+    reaction(
+      () => this.seed,
+      () => {
+        this.selectedNodeId = uuidv5("ROOT_NODE", userService.getUserId());
+      }
+    )
+
+    reaction(
+      () => this.selectedNodeId,
+      () => {
+        if (!this.selectedNodeId) return;
+
+        if (this._syncedNodes.length > 0 && !this._syncedNodes.includes(uuidv5("ROOT_NODE", userService.getUserId()))) {
+          this._syncedNodes = [this.selectedNodeId];
+          return;
+        }
+
+        this._syncedNodes = [...new Set([this.selectedNodeId, ...this._syncedNodes])];
+      }
+    );
+
+    autorun(
+      () => {
+        this.connectDb();
+        this.connectDb();
+      },
+    );
   }
 
   private initialize() {
@@ -58,6 +95,13 @@ export class RootStore {
       });
     }
 
+    const storedPartialSync = localStorage.getItem(STORAGE_KEYS.PARTIAL_SYNC);
+    if (storedPartialSync) {
+      runInAction(() => {
+        this.isPartialSync = storedPartialSync === 'true';
+      });
+    }
+
     const storedShowArchived = localStorage.getItem(STORAGE_KEYS.SHOW_ARCHIVED);
     if (storedShowArchived) {
       runInAction(() => {
@@ -69,15 +113,21 @@ export class RootStore {
   }
 
   private initializePowerSync() {
-    this.powerSync = new PowerSyncDatabase({
-      database: { dbFilename: 'powersync2.db' },
+    this.fullDb = new PowerSyncDatabase({
+      database: { dbFilename: 'full.db' },
       schema: AppSchema,
       flags: {
         disableSSRWarning: true
       }
     });
 
-    window.db = this.powerSync;
+    this.partialDb = new PowerSyncDatabase({
+      database: { dbFilename: 'partial.db' },
+      schema: AppSchema,
+      flags: {
+        disableSSRWarning: true
+      }
+    });
   }
 
   private persistState() {
@@ -86,7 +136,9 @@ export class RootStore {
       isAuthReady: this.isAuthReady,
       isInitializing: this.isInitializing,
       isOfflineMode: this.isOfflineMode,
-      showArchivedNodes: this.showArchivedNodes
+      isPartialSync: this.isPartialSync,
+      showArchivedNodes: this.showArchivedNodes,
+      _syncedNodes: this._syncedNodes
     };
 
     localStorage.setItem(STORAGE_KEYS.STATE, JSON.stringify(state));
@@ -102,7 +154,9 @@ export class RootStore {
           this.isAuthReady = state.isAuthReady;
           this.isInitializing = state.isInitializing;
           this.isOfflineMode = state.isOfflineMode;
+          this.isPartialSync = state.isPartialSync;
           this.showArchivedNodes = state.showArchivedNodes;
+          this._syncedNodes = state._syncedNodes || [];
         });
       }
     } catch (error) {
@@ -184,6 +238,22 @@ export class RootStore {
     });
   }
 
+  private async connectDb() {
+    if (!this.isAuthenticated || this.isOfflineMode) {
+      return;
+    }
+
+    const selected_nodes = [...this._syncedNodes];
+
+    this.partialDb?.connect(backendConnector, {
+      params: { selected_nodes }
+    });
+
+    await this.partialDb?.waitForReady();
+
+    this.fullDb?.connect(backendConnector);
+  }
+
   setOfflineMode(enabled: boolean) {
     runInAction(() => {
       this.isOfflineMode = enabled;
@@ -191,17 +261,20 @@ export class RootStore {
       this.persistState();
     });
 
-    if (this.powerSync) {
+    if (this.db) {
       if (enabled) {
-        this.powerSync.disconnect();
-      } else if (this.isAuthenticated) {
-        const connector = new BackendConnector();
-        this.powerSync.connect(connector);
-        // HACK: Reconnect to force a sync without refresh for now
-        this.powerSync.disconnect();
-        this.powerSync.connect(connector);
+        this.partialDb?.disconnect();
+        this.fullDb?.disconnect();
       }
     }
+  }
+
+  setPartialSync(enabled: boolean) {
+    runInAction(() => {
+      this.isPartialSync = enabled;
+      localStorage.setItem(STORAGE_KEYS.PARTIAL_SYNC, enabled.toString());
+      this.persistState();
+    });
   }
 
   private async initializeWithSeed(seed: string, session: Session) {
@@ -215,12 +288,6 @@ export class RootStore {
 
     try {
       userService.setSeed(seed);
-
-      if (this.powerSync && !this.powerSync.connected && !this.isOfflineMode) {
-        const connector = new BackendConnector();
-        this.powerSync.connect(connector);
-        await this.powerSync.waitForReady();
-      }
 
       runInAction(() => {
         this.isPowerSyncReady = true;
@@ -239,7 +306,6 @@ export class RootStore {
 
   async login(username: string) {
     try {
-      await this.logout();
       const session = await authService.getSession(username);
       this.setSession(session);
       return await this.initializeWithSeed(username, session);
@@ -268,9 +334,10 @@ export class RootStore {
 
   async logout() {
     try {
-      if (this.powerSync?.connected) {
-        this.powerSync.disconnectAndClear();
-      }
+      await this.partialDb?.disconnectAndClear();
+      await this.fullDb?.disconnectAndClear();
+
+      localStorage.removeItem(STORAGE_KEYS.STATE);
 
       authService.clearSession();
 
@@ -279,10 +346,7 @@ export class RootStore {
         this.isPowerSyncReady = false;
         this.isAuthReady = false;
         this.isInitializing = false;
-        this.persistState();
       });
-
-      localStorage.removeItem(STORAGE_KEYS.STATE);
     } catch (error) {
       console.error('Logout failed:', error);
     }
@@ -302,7 +366,13 @@ export class RootStore {
   }
 
   get db() {
-    return this.powerSync;
+    const _db = this.isPartialSync ? this.partialDb : this.fullDb;
+
+    if (typeof window !== 'undefined') {
+      window.db = _db;
+    }
+
+    return _db;
   }
 
   get isAuthenticated() {
@@ -314,16 +384,6 @@ export class RootStore {
   }
 }
 
-let store: RootStore;
+const store = new RootStore();
 
-export function initializeStore() {
-  if (typeof window === 'undefined') {
-    return new RootStore();
-  }
-
-  if (!store) {
-    store = new RootStore();
-  }
-
-  return store;
-}
+export default store;

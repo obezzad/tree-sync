@@ -3,21 +3,33 @@ import { Database } from '@/library/powersync/AppSchema';
 import { v5 as uuidv5, v4 as uuidv4 } from 'uuid';
 import { userService } from '@/library/powersync/userService';
 import { MutationStore } from '@/stores/MutationStore';
+import store from '@/stores/RootStore';
+import { makeAutoObservable, runInAction } from 'mobx';
 
 export type Node = Database['nodes'];
 
 export class NodeService {
-  private mutationStore: MutationStore;
+  private mutationStore!: MutationStore;
 
   constructor(private db: AbstractPowerSyncDatabase) {
-    this.mutationStore = new MutationStore(db);
+    makeAutoObservable(this);
+    this.updateMutationStore();
+  }
+
+  private updateMutationStore() {
+    this.mutationStore = new MutationStore(store.db!);
+  }
+
+  get activeMutationStore() {
+    this.updateMutationStore();
+    return this.mutationStore;
   }
 
   async createNode(data: Partial<Node>) {
     const user_id = userService.getUserId();
     const node_id = uuidv4();
 
-    await this.mutationStore.mutate({
+    await this.activeMutationStore.mutate({
       name: 'create_node',
       args: { ...data, id: node_id },
       optimisticUpdate: async (tx: Transaction) => {
@@ -31,10 +43,14 @@ export class NodeService {
         return insertResult.rows?._array.map(row => row.id) ?? [];
       }
     });
+
+    runInAction(() => {
+      store.selectedNodeId = data.parent_id!;
+    });
   }
 
   async moveNode(nodeId: string, newParentId: string | null) {
-    await this.mutationStore.mutate({
+    await this.activeMutationStore.mutate({
       name: 'move_node',
       args: {
         node_id_to_move: nodeId,
@@ -67,12 +83,16 @@ export class NodeService {
         return updateResult.rows?._array.map(row => row.id) ?? [];
       }
     });
+
+    runInAction(() => {
+      store.selectedNodeId = newParentId;
+    });
   }
 
   async deleteNode(node_id: string) {
     const isRoot = node_id === uuidv5("ROOT_NODE", userService.getUserId());
 
-    await this.mutationStore.mutate({
+    await this.activeMutationStore.mutate({
       name: 'delete_node',
       args: { node_id },
       optimisticUpdate: async (tx: Transaction) => {

@@ -1,6 +1,6 @@
 import { AuthProvider, Session } from '@/library/auth/types';
 import { createClient, User } from '@supabase/supabase-js';
-import { initializeStore } from '@/stores/RootStore';
+import store from '@/stores/RootStore';
 
 function mapUserToSessionUser(user: User | null): Session['user'] | undefined {
   if (!user) return undefined;
@@ -30,14 +30,10 @@ export class SupabaseAuthProvider implements AuthProvider {
     this.supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
   }
 
-  private get store() {
-    return initializeStore();
-  }
-
   async getSession(userId: string): Promise<Session> {
     try {
       // Try to get and refresh existing session
-      const storedSession = this.store.getStoredSession();
+      const storedSession = store.getStoredSession();
       if (storedSession) {
         const { data: { session }, error } = await this.supabaseClient.auth.getSession();
 
@@ -49,10 +45,8 @@ export class SupabaseAuthProvider implements AuthProvider {
             user: mapUserToSessionUser(session.user)
           };
 
-          // Only update if tokens have changed
-          if (session.access_token !== storedSession.access_token) {
-            this.store.setSession(newSession);
-          }
+          store.setSession(newSession);
+
           return newSession;
         }
       }
@@ -89,7 +83,7 @@ export class SupabaseAuthProvider implements AuthProvider {
         user: mapUserToSessionUser(session.user)
       };
 
-      this.store.setSession(newSession);
+      store.setSession(newSession);
       return newSession;
     } catch (error) {
       console.error('Session error:', error);
@@ -100,7 +94,7 @@ export class SupabaseAuthProvider implements AuthProvider {
   }
 
   async clearSession(): Promise<void> {
-    this.store.setSession(null);
+    store.setSession(null);
 
     try {
       await this.supabaseClient.auth.signOut();

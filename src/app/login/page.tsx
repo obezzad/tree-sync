@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { initializeStore } from '@/stores/RootStore';
+import store from '@/stores/RootStore';
 import toast from 'react-hot-toast';
 
 function LoginForm({ from }: { from: string }) {
@@ -11,7 +11,6 @@ function LoginForm({ from }: { from: string }) {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { login } = useAuth();
-  const store = initializeStore();
 
   useEffect(() => {
     const storedSeed = store.seed;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useCallback, memo } from 'react';
+import { useMemo, useState, useCallback, memo, useEffect, useRef } from 'react';
 import { AutoSizer, List } from 'react-virtualized';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import toast from 'react-hot-toast';
@@ -10,7 +10,7 @@ import { BulkAddModal } from './BulkAddModal';
 import { NodeService } from '@/library/powersync/NodeService';
 import type { Node } from '@/library/powersync/NodeService';
 import { treeUtils } from '@/utils/treeUtils';
-import { initializeStore } from '@/stores/RootStore';
+import rootStore from '@/stores/RootStore';
 import { observer } from 'mobx-react-lite';
 
 interface TreeNodeData extends Node {
@@ -28,7 +28,6 @@ const ROW_HEIGHT = 48; // 40px height + 8px margin
 const MemoizedTreeNode = memo(TreeNode);
 
 export const TreeView = observer(({ nodes, nodeService, readOnly = false }: TreeViewProps) => {
-  const rootStore = initializeStore();
   const [isBulkAddModalOpen, setIsBulkAddModalOpen] = useState(false);
   const [selectedNodeForBulk, setSelectedNodeForBulk] = useState<string | null>(null);
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
@@ -76,6 +75,19 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
     flatten(treeData, 1);
     return flattened;
   }, [treeData, collapsedNodesMap]);
+
+  const listRef = useRef<List>(null);
+
+  useEffect(() => {
+    if (listRef.current && rootStore.selectedNodeId) {
+      const selectedIndex = flattenedNodes.findIndex(
+        ({ node }) => node.id === rootStore.selectedNodeId
+      );
+      if (selectedIndex !== -1) {
+        listRef.current.scrollToRow(selectedIndex);
+      }
+    }
+  }, [rootStore.selectedNodeId, flattenedNodes]);
 
   const isNodeInSubtree = useCallback((nodeId: string, subtreeRoot: TreeNodeData): boolean => {
     if (subtreeRoot.id === nodeId) return true;
@@ -145,8 +157,14 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
   const handleDeleteNode = useCallback(async (nodeId: string) => {
     if (readOnly) return;
 
-    await nodeService.deleteNode(nodeId);
-  }, [readOnly]);
+    try {
+      await nodeService.deleteNode(nodeId);
+      toast.success('Node deleted successfully');
+    } catch (error: any) {
+      console.error('Failed to delete node:', error);
+      toast.error(error.message ?? 'Failed to delete node');
+    }
+  }, [readOnly, nodeService]);
 
   const handleToggleExpand = useCallback((nodeId: string) => {
     setCollapsedNodes(prev => {
@@ -197,6 +215,7 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
             }}
             className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 bg-gray-100 rounded flex items-center gap-1"
           >
+            {/* {treeStore.collapsedNodes.size === 0 ? ( */}
             {collapsedNodes.size === 0 ? (
               <>
                 <ChevronDown className="w-4 h-4" />
@@ -219,16 +238,21 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
             <AutoSizer>
               {({ width, height }) => (
                 <List
+                  ref={listRef}
                   width={width}
                   height={height}
                   rowCount={flattenedNodes.length}
                   rowHeight={ROW_HEIGHT}
                   overscanRowCount={20}
+                  recomputeRowHeights={false}
+                  scrollToAlignment="auto"
                   rowRenderer={({ index, key, style }) => {
                     const { node, level } = flattenedNodes[index];
+                    const isSelected = rootStore.selectedNodeId === node.id;
+
                     return (
                       <div
-                        key={key}
+                        key={`${key}-${isSelected}`}
                         style={{
                           ...style,
                         }}

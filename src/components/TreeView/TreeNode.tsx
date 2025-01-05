@@ -1,8 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import rootStore from '@/stores/RootStore';
+import { observer } from 'mobx-react-lite';
 import { ChevronRight, ChevronDown, Plus, Trash2, GripVertical, Database } from 'lucide-react';
 import type { Node } from '@/library/powersync/NodeService';
+
 interface TreeNodeData extends Node {
   children: TreeNodeData[];
 }
@@ -19,7 +22,7 @@ interface TreeNodeProps {
   onToggleExpand?: (nodeId: string) => void;
 }
 
-export const TreeNode = ({
+export const TreeNode = observer(({
   node,
   level,
   onAddChild,
@@ -30,6 +33,8 @@ export const TreeNode = ({
   isExpanded = true,
   onToggleExpand
 }: TreeNodeProps) => {
+  const wasSelected = rootStore.isPartialSync && rootStore._syncedNodes.includes(node.id);
+  const isSelected = rootStore.selectedNodeId === node.id;
   const [isHovered, setIsHovered] = useState(false);
   const [dragOverPosition, setDragOverPosition] = useState<'before' | 'after' | 'inside' | null>(null);
   const payload = JSON.parse(node.payload ?? '{}');
@@ -112,12 +117,14 @@ export const TreeNode = ({
     }
   };
 
-  const nodeName = level === 1 ? 'ROOT' : payload.name ?? `Unnamed Node ${node.id}`;
+  const nodeName = payload.name ?? `Unnamed Node ${node.id}`;
 
   return (
     <div className="select-none w-full h-full">
       <div
         className={[
+          'bg-opacity-50',
+          'hover:bg-opacity-100',
           'rounded',
           'transition-colors',
           'w-full',
@@ -127,10 +134,15 @@ export const TreeNode = ({
           !isRoot ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
           'relative',
           node._is_pending ? 'bg-yellow-100' :
-          node.archived_at ? 'bg-gray-50' : 'hover:bg-gray-50',
+          node.archived_at ? 'bg-gray-50' :
+          isSelected ? 'bg-blue-300' :
+          wasSelected ? 'bg-blue-100' : 'hover:bg-gray-100',
           getDropIndicatorStyle(),
         ].join(' ')}
-        onClick={() => hasChildren && onToggleExpand?.(node.id)}
+        onClick={(e) => {
+          e.stopPropagation();
+          rootStore.selectedNodeId = node.id;
+        }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         draggable={!readOnly && !isRoot}
@@ -149,7 +161,15 @@ export const TreeNode = ({
               <GripVertical className="w-4 h-4 text-gray-500" />
             </div>
           )}
-          <div className="w-6 flex-shrink-0 flex items-center">
+          <div
+            className={`w-6 flex-shrink-0 flex items-center justify-center rounded hover:bg-gray-200 mx-1 my-0.5 ${hasChildren ? 'cursor-pointer' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (hasChildren && onToggleExpand) {
+                onToggleExpand(node.id);
+              }
+            }}
+          >
             {hasChildren ? (
               isExpanded ? (
                 <ChevronDown className="w-4 h-4 text-gray-500" />
@@ -199,4 +219,4 @@ export const TreeNode = ({
       </div>
     </div>
   );
-};
+});

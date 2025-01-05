@@ -2,9 +2,9 @@
 
 import { PowerSyncContext } from '@powersync/react';
 import { observer } from 'mobx-react-lite';
-import React, { Suspense, useContext, useEffect } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { initializeStore } from '@/stores/RootStore';
+import store from '@/stores/RootStore';
 
 export const LoadingSpinner = () => (
   <div className="flex items-center justify-center min-h-screen">
@@ -12,17 +12,7 @@ export const LoadingSpinner = () => (
   </div>
 );
 
-export const usePowerSync = () => {
-  const context = useContext(PowerSyncContext);
-  // Don't throw on login page or during initialization
-  if (!context) {
-    return null;
-  }
-  return context;
-};
-
 export const SystemProvider = observer(({ children }: { children: React.ReactNode }) => {
-  const store = initializeStore();
   const pathname = usePathname();
   const isLoginPage = pathname === '/login';
 

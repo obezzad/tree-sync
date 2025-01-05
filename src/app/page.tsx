@@ -3,19 +3,20 @@
 import { useEffect, useState } from 'react';
 import { TreeView } from '@/components/TreeView/TreeView';
 import { NodeService } from '@/library/powersync/NodeService';
-import { usePowerSync } from '@/components/providers/SystemProvider';
+import { usePowerSync } from '@powersync/react';
 import { useQuery, useStatus } from '@powersync/react';
 import { AbstractPowerSyncDatabase } from '@powersync/web';
-import { initializeStore } from '@/stores/RootStore';
+import store from '@/stores/RootStore';
 import { initializeAuthStore } from '@/stores/AuthStore';
 import { observer } from 'mobx-react-lite';
+import { v5 as uuidv5 } from 'uuid';
+import { userService } from '@/library/powersync/userService';
 
 const Home = observer(() => {
   const db = usePowerSync();
 
   if (!db) throw new Error('PowerSync context not found');
 
-  const store = initializeStore();
   const authStore = initializeAuthStore();
 
   const local_id = store.session?.user?.user_metadata?.local_id;
@@ -31,8 +32,6 @@ const Home = observer(() => {
 
   const [remoteCount, setRemoteCount] = useState<number | null>(null);
 
-  const bucketCount = buckets[0]?.bucket_count ?? 0;
-
   useEffect(() => {
     const fetchData = async () => {
       const { data, count } = await authStore.supabase
@@ -46,10 +45,24 @@ const Home = observer(() => {
     fetchData();
   }, [downloadedOps]);
 
+  useEffect(() => {
+    if (!store.selectedNodeId) {
+      store.selectedNodeId = uuidv5("ROOT_NODE", userService.getUserId())
+    }
+  }, []);
+
   return (
     <main className="flex flex-col gap-4 items-center p-8">
-      <p>User's buckets: <b>{bucketCount}</b></p>
-      <p>All synced nodes across buckets: <b>{allNodes[0]?.count ?? 0}</b></p>
+      <p>User's buckets: <b>{buckets[0]?.bucket_count ?? 0}</b></p>
+      <p>All synced nodes across buckets: {' '}
+        <b>
+          {allNodes[0]?.count ?? 0}
+          {remoteCount ?
+            <>
+              {' /'} {remoteCount} ({Math.round((allNodes[0]?.count ?? 0) / remoteCount * 10000) / 100}%)
+            </> : <span className='text-gray-500'>Loading...</span>}
+        </b>
+      </p>
       <p>
         Nodes of this user:{' '}
         {
@@ -58,15 +71,19 @@ const Home = observer(() => {
             <span className='text-gray-500'>Loading...</span>
         }
       </p>
-      <p>Downloaded ops: {remoteCount ?
-        <b>{downloadedOps[0]?.count ?? 0}/{remoteCount} ({Math.round((downloadedOps[0]?.count ?? 0) / remoteCount * 10000)/100}%)</b> :
-        <span className='text-gray-500'>Loading...</span>}
-      </p>
+      <p>Downloaded ops: <b>{downloadedOps[0]?.count ?? 0}</b></p>
       <p>Mutations pending upload: <b>{pendingUpload[0]?.count ?? 0}</b></p>
+      <p>Last selected node: <b>{store.selectedNodeId}</b></p>
+      <p>Selected nodes: <b>{store._syncedNodes.length}</b></p>
       <div>
         {status.connected ?
           <span className='text-green-500'>Connected to server</span> :
           <span className='text-red-500'>Not connected to server</span>}
+      </div>
+      <div>
+        {status.hasSynced ?
+          <span className='text-green-500'>Initial sync completed</span> :
+          <span className='text-red-500'>Initial sync pending</span>}
       </div>
       <TreeView
         nodes={nodes}

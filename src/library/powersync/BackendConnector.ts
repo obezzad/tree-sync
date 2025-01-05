@@ -1,10 +1,10 @@
 import { AbstractPowerSyncDatabase, PowerSyncBackendConnector, UpdateType } from '@powersync/web';
-import { initializeStore } from '@/stores/RootStore';
+import store from '@/stores/RootStore';
 import { initializeAuthStore } from '@/stores/AuthStore';
 import { userService } from '@/library/powersync/userService';
 import { Database } from './AppSchema';
 
-export class BackendConnector implements PowerSyncBackendConnector {
+class BackendConnector implements PowerSyncBackendConnector {
   private syncEndpoint: string | undefined;
   private powersyncUrl: string | undefined;
   private authStore = initializeAuthStore();
@@ -19,7 +19,6 @@ export class BackendConnector implements PowerSyncBackendConnector {
   }
 
   async fetchCredentials() {
-    const store = initializeStore();
     const session = await store.refreshSession();
 
     if (!this.powersyncUrl || !session) {
@@ -97,3 +96,7 @@ export class BackendConnector implements PowerSyncBackendConnector {
     }
   }
 }
+
+const backendConnector = new BackendConnector();
+
+export default backendConnector;
