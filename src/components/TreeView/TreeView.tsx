@@ -229,7 +229,7 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
             )}
           </button>
         </div>
-        <div className="overflow-x-auto" style={{ height: '40vh' }}>
+        <div className="overflow-x-auto" style={{ height: '80vh' }}>
           {nodes.length === 0 ? (
             <div className="text-center text-gray-500 p-4">
               <div className="mb-4">No nodes available</div>

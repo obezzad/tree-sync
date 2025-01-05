@@ -52,43 +52,34 @@ const Home = observer(() => {
   }, []);
 
   return (
-    <main className="flex flex-col gap-4 items-center p-8">
-      <p>User's buckets: <b>{buckets[0]?.bucket_count ?? 0}</b></p>
-      <p>All synced nodes across buckets: {' '}
-        <b>
+    <main className="flex h-[calc(100vh-theme(spacing.16))]">
+      <aside className="hidden sm:flex sm:w-72 py-1 px-2 border-r flex-col gap-0.5 text-xs">
+        <div className="text-gray-600 leading-tight">User's buckets: <b className="text-black">{buckets[0]?.bucket_count ?? 0}</b></div>
+        <div className="text-gray-600 leading-tight">Synced nodes: <b className="text-black">
           {allNodes[0]?.count ?? 0}
-          {remoteCount ?
-            <>
-              {' /'} {remoteCount} ({Math.round((allNodes[0]?.count ?? 0) / remoteCount * 10000) / 100}%)
-            </> : <span className='text-gray-500'>Loading...</span>}
-        </b>
-      </p>
-      <p>
-        Nodes of this user:{' '}
-        {
-          local_id ?
-            <b>{userNodes[0]?.count ?? 0}</b> :
-            <span className='text-gray-500'>Loading...</span>
-        }
-      </p>
-      <p>Downloaded ops: <b>{downloadedOps[0]?.count ?? 0}</b></p>
-      <p>Mutations pending upload: <b>{pendingUpload[0]?.count ?? 0}</b></p>
-      <p>Last selected node: <b>{store.selectedNodeId}</b></p>
-      <p>Selected nodes: <b>{store._syncedNodes.length}</b></p>
-      <div>
-        {status.connected ?
-          <span className='text-green-500'>Connected to server</span> :
-          <span className='text-red-500'>Not connected to server</span>}
-      </div>
-      <div>
-        {status.hasSynced ?
-          <span className='text-green-500'>Initial sync completed</span> :
-          <span className='text-red-500'>Initial sync pending</span>}
-      </div>
-      <TreeView
-        nodes={nodes}
-        nodeService={nodeService}
-      />
+          {remoteCount && <> / {remoteCount} ({Math.round((allNodes[0]?.count ?? 0) / remoteCount * 10000) / 100}%)</>}
+        </b></div>
+        <div className="text-gray-600 leading-tight">User nodes: <b className="text-black">{userNodes[0]?.count ?? 0}</b></div>
+        <div className="text-gray-600 leading-tight">Downloaded ops: <b className="text-black">{downloadedOps[0]?.count ?? 0}</b></div>
+        <div className="text-gray-600 leading-tight">Mutations pending upload: <b className="text-black">{pendingUpload[0]?.count ?? 0}</b></div>
+        <div className="text-gray-600 leading-tight">Selected ID: <b className="text-black truncate block">{store.selectedNodeId}</b></div>
+        <div className="text-gray-600 leading-tight">Selected nodes count: <b className="text-black">{store._syncedNodes.length}</b></div>
+        <div className="leading-tight">
+          {status.connected ?
+            <span className='text-green-500'>Connected</span> :
+            <span className='text-red-500'>Disconnected</span>}
+          {' • '}
+          {status.hasSynced ?
+            <span className='text-green-500'>Initial sync done</span> :
+            <span className='text-red-500'>Pending initial sync</span>}
+        </div>
+      </aside>
+      <section className="flex-1 h-full overflow-y-auto">
+        <TreeView
+          nodes={nodes}
+          nodeService={nodeService}
+        />
+      </section>
     </main>
   );
 });
