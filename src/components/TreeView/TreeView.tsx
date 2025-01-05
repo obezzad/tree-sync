@@ -5,7 +5,7 @@ import { AutoSizer, List } from 'react-virtualized';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import toast from 'react-hot-toast';
 import { TreeNode } from './TreeNode';
-import { ChevronDown, ChevronRight, Archive } from 'lucide-react';
+import { ChevronDown, ChevronRight, Archive, Focus } from 'lucide-react';
 import { BulkAddModal } from './BulkAddModal';
 import { NodeService } from '@/library/powersync/NodeService';
 import type { Node } from '@/library/powersync/NodeService';
@@ -45,13 +45,29 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
 
     const buildTree = (parentId: string | null): TreeNodeData[] => {
       const children = nodeMap.get(parentId) || [];
+
       return children.map(node => ({
         ...node,
         children: buildTree(node.id)
       }));
     };
 
-    return buildTree(null);
+    const selectedNode = nodes.find(node => node.id === rootStore.selectedNodeId);
+
+    if (!rootStore.isFocusedView || !selectedNode) {
+      return buildTree(null);
+    }
+
+    const parent = selectedNode.parent_id ? nodes.find(node => node.id === selectedNode.parent_id) : null;
+
+    if (!parent) {
+      return buildTree(null);
+    }
+
+    return [{
+      ...parent,
+      children: buildTree(parent.id)
+    }];
   }, [nodes]);
 
   const collapsedNodesMap = useMemo(() => {
@@ -181,7 +197,18 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
   return (
     <ErrorBoundary>
       <div className="w-full max-w-3xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="p-2 border-b border-gray-200 flex justify-end gap-2">
+      <div className="p-2 border-b border-gray-200 flex justify-between items-center">
+        <button
+          onClick={() => rootStore.setFocusedView(!rootStore.isFocusedView)}
+          className={`px-3 py-1 text-sm ${rootStore.isFocusedView ? 'text-blue-600 bg-blue-100' : 'text-gray-600 bg-gray-100'} hover:text-gray-800 rounded flex items-center gap-1`}
+          disabled={!rootStore.selectedNodeId}
+          title={rootStore.selectedNodeId ? "Focus on selected node" : "Select a node to focus"}
+        >
+          <Focus className="w-4 h-4" />
+          {rootStore.isFocusedView ? 'Exit Focus' : 'Focus View'}
+        </button>
+
+        <div className="flex gap-2">
           <button
             onClick={() => rootStore.setShowArchivedNodes(!rootStore.showArchivedNodes)}
             className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 bg-gray-100 rounded flex items-center gap-1"
@@ -229,7 +256,8 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
             )}
           </button>
         </div>
-        <div className="overflow-x-auto" style={{ height: '80vh' }}>
+      </div>
+      <div className="overflow-x-auto" style={{ height: '80vh' }}>
           {nodes.length === 0 ? (
             <div className="text-center text-gray-500 p-4">
               <div className="mb-4">No nodes available</div>
