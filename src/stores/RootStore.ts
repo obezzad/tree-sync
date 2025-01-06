@@ -257,12 +257,19 @@ export class RootStore {
     const selected_nodes = [...this._syncedNodes];
 
     this.partialDb?.connect(backendConnector, {
-      params: { selected_nodes }
+      params: {
+        user: userService.getUserId(),
+        selected_nodes
+      }
     });
 
     await this.partialDb?.waitForReady();
 
-    this.fullDb?.connect(backendConnector);
+    this.fullDb?.connect(backendConnector, {
+      params: {
+        user: userService.getUserId()
+      }
+    });
   }
 
   setOfflineMode(enabled: boolean) {

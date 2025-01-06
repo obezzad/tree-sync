@@ -61,7 +61,7 @@ const Home = observer(() => {
     WHERE user_id = ?
       ${store.showArchivedNodes ? '' : 'AND archived_at IS NULL'}
       ${store.isFocusedView ? 'AND id IN (SELECT id FROM focused_nodes)' : ''}
-    ORDER BY created_at DESC
+    ORDER BY created_at DESC, id
   `, [
     store.selectedNodeId, store.selectedNodeId,
     store.selectedNodeId, store.selectedNodeId,
