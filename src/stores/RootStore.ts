@@ -3,9 +3,10 @@ import { PowerSyncDatabase } from '@powersync/web';
 import { AppSchema } from '@/library/powersync/AppSchema';
 import backendConnector from '@/library/powersync/BackendConnector';
 import { authService } from '@/library/auth/authService';
-import { userService } from '@/library/powersync/userService';
+import { NAMESPACE, userService } from '@/library/powersync/userService';
 import type { Session } from '@/library/auth/types';
 import { v5 as uuidv5 } from 'uuid';
+import { measureOnce, METRICS, registerStart, reset } from '@/utils/metrics';
 
 const STORAGE_KEYS = {
   SEED: 'tree-sync-seed',
@@ -61,18 +62,19 @@ export class RootStore {
       () => {
         if (!this.selectedNodeId) return;
 
-        if (this._syncedNodes.length > 0 && !this._syncedNodes.includes(uuidv5("ROOT_NODE", userService.getUserId()))) {
-          this._syncedNodes = [this.selectedNodeId];
-          return;
-        }
+        // if (this._syncedNodes.length > 0 && !this._syncedNodes.includes(uuidv5("ROOT_NODE", userService.getUserId()))) {
+        //   this._syncedNodes = [this.selectedNodeId];
+        //   return;
+        // }
 
         this._syncedNodes = [...new Set([this.selectedNodeId, ...this._syncedNodes])];
       }
     );
 
-    autorun(
+    reaction(
+      () => this._syncedNodes,
       () => {
-        this.connectDb();
+        console.log("Synced nodes:", this._syncedNodes);
         this.connectDb();
       },
     );
@@ -249,26 +251,47 @@ export class RootStore {
     });
   }
 
-  private async connectDb() {
+  async connectDb() {
     if (!this.isAuthenticated || this.isOfflineMode) {
       return;
     }
 
     const selected_nodes = [...this._syncedNodes];
 
+    registerStart("init_db_connect");
+
     this.partialDb?.connect(backendConnector, {
       params: {
         user: userService.getUserId(),
         selected_nodes
       }
+    }).then(() => {
+      registerStart("partial_db_connected");
     });
 
-    await this.partialDb?.waitForReady();
+
+    this.partialDb?.waitForReady().then(() => {
+      registerStart("partial_db_ready");
+    });
+
+    this.partialDb?.waitForFirstSync().then(() => {
+      measureOnce(METRICS.TIME_TO_PARTIAL_REPLICATION);
+    });
 
     this.fullDb?.connect(backendConnector, {
       params: {
         user: userService.getUserId()
       }
+    }).then(() => {
+      registerStart("full_db_connected");
+    });
+
+    this.fullDb?.waitForReady().then(() => {
+      registerStart("full_db_ready");
+    });
+
+    this.fullDb?.waitForFirstSync().then(() => {
+      measureOnce(METRICS.TIME_TO_FULL_REPLICATION);
     });
   }
 
@@ -299,8 +322,10 @@ export class RootStore {
     runInAction(() => {
       this.isInitializing = true;
       this.seed = seed;
+      console.log({ seed })
       this.session = session;
       localStorage.setItem(STORAGE_KEYS.SEED, seed);
+      this._syncedNodes = [uuidv5("ROOT_NODE", uuidv5(seed, NAMESPACE))];
       this.persistState();
     });
 
@@ -354,9 +379,8 @@ export class RootStore {
     try {
       await this.partialDb?.disconnectAndClear();
       await this.fullDb?.disconnectAndClear();
-
+      reset();
       localStorage.removeItem(STORAGE_KEYS.STATE);
-
       authService.clearSession();
 
       runInAction(() => {
@@ -364,6 +388,7 @@ export class RootStore {
         this.isPowerSyncReady = false;
         this.isAuthReady = false;
         this.isInitializing = false;
+        this._syncedNodes = [];
       });
     } catch (error) {
       console.error('Logout failed:', error);

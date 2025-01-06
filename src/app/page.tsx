@@ -11,6 +11,7 @@ import { initializeAuthStore } from '@/stores/AuthStore';
 import { observer } from 'mobx-react-lite';
 import { v5 as uuidv5 } from 'uuid';
 import { userService } from '@/library/powersync/userService';
+import { measureOnce, METRICS, registerStart } from '@/utils/metrics';
 
 const Home = observer(() => {
   const db = usePowerSync();
@@ -77,6 +78,10 @@ const Home = observer(() => {
   const [remoteCount, setRemoteCount] = useState<number | null>(null);
 
   useEffect(() => {
+    registerStart("page_loaded");
+  }, []);
+
+  useEffect(() => {
     const fetchData = async () => {
       const { data, count } = await authStore.supabase
         .from('nodes')
@@ -94,6 +99,10 @@ const Home = observer(() => {
       store.selectedNodeId = uuidv5("ROOT_NODE", userService.getUserId())
     }
   }, []);
+
+  if (allNodes[0]?.count > 0) {
+    measureOnce(METRICS.TIME_TO_INTERACTION);
+  }
 
   return (
     <main className="flex h-[calc(100vh-theme(spacing.16))]">
