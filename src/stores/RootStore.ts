@@ -62,19 +62,18 @@ export class RootStore {
       () => {
         if (!this.selectedNodeId) return;
 
-        // if (this._syncedNodes.length > 0 && !this._syncedNodes.includes(uuidv5("ROOT_NODE", userService.getUserId()))) {
-        //   this._syncedNodes = [this.selectedNodeId];
-        //   return;
-        // }
+        if (this._syncedNodes.length > 0 && !this._syncedNodes.includes(uuidv5("ROOT_NODE", userService.getUserId()))) {
+          this._syncedNodes = [this.selectedNodeId];
+          return;
+        }
 
         this._syncedNodes = [...new Set([this.selectedNodeId, ...this._syncedNodes])];
       }
     );
 
     reaction(
-      () => this._syncedNodes,
+      () => [this._syncedNodes, this.isAuthenticated, this.isOfflineMode],
       () => {
-        console.log("Synced nodes:", this._syncedNodes);
         this.connectDb();
       },
     );
