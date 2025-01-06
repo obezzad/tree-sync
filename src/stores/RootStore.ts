@@ -377,6 +377,10 @@ export class RootStore {
 
   async logout() {
     try {
+      runInAction(() => {
+        this.isInitializing = true;
+      });
+
       await this.partialDb?.disconnectAndClear();
       await this.fullDb?.disconnectAndClear();
       reset();
