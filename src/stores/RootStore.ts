@@ -39,7 +39,7 @@ export class RootStore {
   isOfflineMode = false;
   isPartialSync = true;
   showArchivedNodes = true;
-  isFocusedView = true;
+  isFocusedView = false;
   selectedNodeId: string | null = null;
   _syncedNodes: string[] = [];
 
