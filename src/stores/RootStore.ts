@@ -292,6 +292,23 @@ export class RootStore {
     this.fullDb?.waitForFirstSync().then(() => {
       measureOnce(METRICS.TIME_TO_FULL_REPLICATION);
     });
+
+    if ((await this.db?.getUploadQueueStats())?.count) {
+      if (this.isPartialSync) {
+        this.partialDb?.connect(backendConnector, {
+          params: {
+            user: userService.getUserId(),
+            selected_nodes
+          }
+        });
+      } else {
+        this.fullDb?.connect(backendConnector, {
+          params: {
+            user: userService.getUserId()
+          }
+        });
+      }
+    }
   }
 
   setOfflineMode(enabled: boolean) {
