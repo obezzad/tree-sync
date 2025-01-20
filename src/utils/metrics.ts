@@ -39,6 +39,10 @@ export function timestamp(name: string) {
   )
 }
 
+export function reset() {
+  measurements.clear()
+}
+
 export const METRICS = {
   TIME_TO_INTERACTION: "Time to Interaction",
   TIME_TO_PARTIAL_REPLICATION: "Time to Replication; Partial",

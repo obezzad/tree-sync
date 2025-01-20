@@ -6,7 +6,7 @@ import { authService } from '@/library/auth/authService';
 import { NAMESPACE, userService } from '@/library/powersync/userService';
 import type { Session } from '@/library/auth/types';
 import { v5 as uuidv5 } from 'uuid';
-import { measureOnce, METRICS } from '@/utils/metrics';
+import { measureOnce, METRICS, reset } from '@/utils/metrics';
 
 const STORAGE_KEYS = {
   SEED: 'tree-sync-seed',
@@ -385,6 +385,7 @@ export class RootStore {
 
       await this.partialDb?.disconnectAndClear();
       await this.fullDb?.disconnectAndClear();
+      reset();
       localStorage.removeItem(STORAGE_KEYS.STATE);
       authService.clearSession();
 
