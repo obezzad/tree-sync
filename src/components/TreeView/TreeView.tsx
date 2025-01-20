@@ -31,6 +31,25 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
   const [isBulkAddModalOpen, setIsBulkAddModalOpen] = useState(false);
   const [selectedNodeForBulk, setSelectedNodeForBulk] = useState<string | null>(null);
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
+  const collapsedRootIdsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    const rootNodes = nodes.filter(node => node.parent_id === null);
+    const newRootIds = rootNodes.map(node => node.id);
+
+    const newRootsToCollapse = newRootIds.filter(id => !collapsedRootIdsRef.current.has(id));
+
+    if (newRootsToCollapse.length > 0) {
+      setCollapsedNodes(prev => {
+        const next = new Set(prev);
+        newRootsToCollapse.forEach(id => {
+          next.add(id);
+          collapsedRootIdsRef.current.add(id);
+        });
+        return next;
+      });
+    }
+  }, [nodes]);
 
   const treeData = useMemo(() => {
     const nodeMap = new Map<string | null, Node[]>();
@@ -142,6 +161,16 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
       }
 
       await nodeService.moveNode(sourceId, targetId);
+
+      if (targetId === null && !collapsedRootIdsRef.current.has(sourceId)) {
+        setCollapsedNodes(prev => {
+          const next = new Set(prev);
+          next.add(sourceId);
+          collapsedRootIdsRef.current.add(sourceId);
+          return next;
+        });
+      }
+
       toast.success('Node moved successfully');
     } catch (error: any) {
       console.error('Failed to move node:', error);
