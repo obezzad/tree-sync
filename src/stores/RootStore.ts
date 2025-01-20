@@ -6,7 +6,7 @@ import { authService } from '@/library/auth/authService';
 import { NAMESPACE, userService } from '@/library/powersync/userService';
 import type { Session } from '@/library/auth/types';
 import { v5 as uuidv5 } from 'uuid';
-import { measureOnce, METRICS, registerStart, reset } from '@/utils/metrics';
+import { measureOnce, METRICS } from '@/utils/metrics';
 
 const STORAGE_KEYS = {
   SEED: 'tree-sync-seed',
@@ -258,21 +258,12 @@ export class RootStore {
 
     const selected_nodes = [...this._syncedNodes];
 
-    registerStart("init_db_connect");
-
     this.partialDb?.connect(backendConnector, {
       params: {
         user: userService.getUserId(),
         selected_nodes
       }
-    }).then(() => {
-      registerStart("partial_db_connected");
-    });
-
-
-    this.partialDb?.waitForReady().then(() => {
-      registerStart("partial_db_ready");
-    });
+    })
 
     this.partialDb?.waitForFirstSync().then(() => {
       measureOnce(METRICS.TIME_TO_PARTIAL_REPLICATION);
@@ -282,13 +273,7 @@ export class RootStore {
       params: {
         user: userService.getUserId()
       }
-    }).then(() => {
-      registerStart("full_db_connected");
-    });
-
-    this.fullDb?.waitForReady().then(() => {
-      registerStart("full_db_ready");
-    });
+    })
 
     this.fullDb?.waitForFirstSync().then(() => {
       measureOnce(METRICS.TIME_TO_FULL_REPLICATION);
@@ -400,7 +385,6 @@ export class RootStore {
 
       await this.partialDb?.disconnectAndClear();
       await this.fullDb?.disconnectAndClear();
-      reset();
       localStorage.removeItem(STORAGE_KEYS.STATE);
       authService.clearSession();
 

@@ -11,8 +11,9 @@ import { initializeAuthStore } from '@/stores/AuthStore';
 import { observer } from 'mobx-react-lite';
 import { v5 as uuidv5 } from 'uuid';
 import { userService } from '@/library/powersync/userService';
-import { measureOnce, METRICS, registerStart, timestamp } from '@/utils/metrics';
+import { measure, measureOnce, METRICS, registerLastSync, registerStart, timestamp } from '@/utils/metrics';
 import { usePrevious } from '@/hooks/usePrevious';
+import { useHasFocus } from '@/hooks/useHasFocus';
 
 const Home = observer(() => {
   const db = usePowerSync();
@@ -75,21 +76,34 @@ const Home = observer(() => {
   ]);
   const { data: buckets } = useQuery(`SELECT count(DISTINCT bucket) as bucket_count FROM ps_oplog`);
   const { data: downloadedOps } = useQuery('select count() as count from ps_oplog');
+  const prevOps = usePrevious(downloadedOps?.[0]?.count);
   const { data: pendingUpload } = useQuery('select count(distinct tx_id) as count from ps_crud');
   const status = useStatus();
+  const isTabFocused = useHasFocus();
 
   const [remoteCount, setRemoteCount] = useState<number | null>(null);
 
   useEffect(() => {
-    registerStart("page_loaded");
+    registerStart();
   }, []);
 
   useEffect(() => {
-    if (prevCount === remoteNodes?.[0]?.count)
+    registerLastSync();
+  }, [nodes]);
+
+  useEffect(() => {
+    if (!prevCount)
+      return;
+
+    if (prevCount === remoteNodes?.[0]?.count && prevOps === downloadedOps?.[0]?.count)
       return;
 
     timestamp("PULL");
-  }, [remoteNodes]);
+
+    if (isTabFocused) {
+      measure("FOREGROUND");
+    }
+  }, [downloadedOps]);
 
   useEffect(() => {
     const fetchData = async () => {
