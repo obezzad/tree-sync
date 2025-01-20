@@ -1,5 +1,6 @@
 import { makeAutoObservable } from 'mobx';
 import { AbstractPowerSyncDatabase, Transaction } from '@powersync/web';
+import { timestamp } from '@/utils/metrics';
 
 export type Mutation = {
   name: string;
@@ -33,6 +34,8 @@ export class MutationStore {
          VALUES (uuid(), ?, ?, current_timestamp)`,
         [config.name, JSON.stringify(config.args)]
       );
+
+      timestamp(`PUSH ${config.name}`);
     });
 
     return affectedNodeIds;

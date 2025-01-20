@@ -11,7 +11,8 @@ import { initializeAuthStore } from '@/stores/AuthStore';
 import { observer } from 'mobx-react-lite';
 import { v5 as uuidv5 } from 'uuid';
 import { userService } from '@/library/powersync/userService';
-import { measureOnce, METRICS, registerStart } from '@/utils/metrics';
+import { measureOnce, METRICS, registerStart, timestamp } from '@/utils/metrics';
+import { usePrevious } from '@/hooks/usePrevious';
 
 const Home = observer(() => {
   const db = usePowerSync();
@@ -25,6 +26,8 @@ const Home = observer(() => {
 
   const { data: allNodes } = useQuery('SELECT count(id) as count FROM nodes');
   const { data: userNodes } = useQuery('SELECT count(id) as count FROM nodes WHERE user_id = ?', [local_id]);
+  const { data: remoteNodes } = useQuery('SELECT count(id) as count FROM nodes WHERE _is_pending IS NULL');
+  const prevCount = usePrevious(remoteNodes?.[0]?.count);
   const { data: nodes } = useQuery(`
     WITH parent AS (
       SELECT id, parent_id
@@ -80,6 +83,13 @@ const Home = observer(() => {
   useEffect(() => {
     registerStart("page_loaded");
   }, []);
+
+  useEffect(() => {
+    if (prevCount === remoteNodes?.[0]?.count)
+      return;
+
+    timestamp("PULL");
+  }, [remoteNodes]);
 
   useEffect(() => {
     const fetchData = async () => {

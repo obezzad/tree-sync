@@ -151,6 +151,7 @@ export class RootStore {
   private hydrateState() {
     try {
       const storedState = localStorage.getItem(STORAGE_KEYS.STATE);
+
       if (storedState) {
         const state: PersistedState = JSON.parse(storedState);
         runInAction(() => {
