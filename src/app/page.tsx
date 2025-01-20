@@ -27,7 +27,7 @@ const Home = observer(() => {
 
   const { data: allNodes } = useQuery('SELECT count(id) as count FROM nodes');
   const { data: userNodes } = useQuery('SELECT count(id) as count FROM nodes WHERE user_id = ?', [local_id]);
-  const { data: remoteNodes } = useQuery('SELECT count(id) as count FROM nodes WHERE _is_pending IS NULL');
+  const { data: remoteNodes } = useQuery('SELECT count(id) as count FROM nodes WHERE user_id = ? AND _is_pending IS NULL', [local_id]);
   const prevCount = usePrevious(remoteNodes?.[0]?.count);
   const { data: nodes } = useQuery(`
     WITH parent AS (

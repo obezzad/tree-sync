@@ -25,6 +25,8 @@ export function measureOnce(name: string) {
 export function measure(name: string) {
   const end = performance.now()
 
+  if (end - lastSync < 30) return
+
   console.log(
     `%c[${name.toUpperCase()}] Took ${end - lastSync}ms.`,
     "color: aqua; font-weight: bold; font-size: 12px;")
