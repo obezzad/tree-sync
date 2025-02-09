@@ -1,5 +1,5 @@
 import { autorun, makeAutoObservable, reaction, runInAction } from 'mobx';
-import { PowerSyncDatabase } from '@powersync/web';
+import { PowerSyncDatabase, WASQLiteOpenFactory, WASQLiteVFS } from '@powersync/web';
 import { AppSchema } from '@/library/powersync/AppSchema';
 import backendConnector from '@/library/powersync/BackendConnector';
 import { authService } from '@/library/auth/authService';
@@ -74,6 +74,10 @@ export class RootStore {
     reaction(
       () => [this._syncedNodes, this.isAuthenticated, this.isOfflineMode],
       () => {
+        console.log(
+          "%cReconnect DB",
+          "color: lime"
+        )
         this.connectDb();
       },
     );
@@ -117,18 +121,34 @@ export class RootStore {
 
   private initializePowerSync() {
     this.fullDb = new PowerSyncDatabase({
-      database: { dbFilename: 'full.db' },
+      database: new WASQLiteOpenFactory({
+        dbFilename: 'full.db',
+        vfs: WASQLiteVFS.OPFSCoopSyncVFS,
+        flags: {
+          enableMultiTabs: typeof SharedWorker !== 'undefined',
+          disableSSRWarning: true,
+        }
+      }),
       schema: AppSchema,
       flags: {
-        disableSSRWarning: true
+        enableMultiTabs: typeof SharedWorker !== 'undefined',
+        disableSSRWarning: true,
       }
     });
 
     this.partialDb = new PowerSyncDatabase({
-      database: { dbFilename: 'partial.db' },
+      database: new WASQLiteOpenFactory({
+        dbFilename: 'partial.db',
+        vfs: WASQLiteVFS.OPFSCoopSyncVFS,
+        flags: {
+          enableMultiTabs: typeof SharedWorker !== 'undefined',
+          disableSSRWarning: true,
+        },
+      }),
       schema: AppSchema,
       flags: {
-        disableSSRWarning: true
+        enableMultiTabs: typeof SharedWorker !== 'undefined',
+        disableSSRWarning: true,
       }
     });
   }
