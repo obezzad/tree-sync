@@ -30,14 +30,14 @@ importers:
         specifier: ^6.1.9
         version: 6.1.9(@emotion/react@11.13.5(@types/react@18.3.12)(react@18.3.1))(@emotion/styled@11.13.5(@emotion/react@11.13.5(@types/react@18.3.12)(react@18.3.1))(@types/react@18.3.12)(react@18.3.1))(@types/react@18.3.12)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@powersync/common':
-        specifier: ^1.22.2
-        version: 1.24.0
+        specifier: file:local_modules/@powersync/common
+        version: file:local_modules/@powersync/common
       '@powersync/react':
         specifier: ^1.5.1
-        version: 1.5.1(@powersync/common@1.24.0)(react@18.3.1)
+        version: 1.5.1(@powersync/common@file:local_modules/@powersync/common)(react@18.3.1)
       '@powersync/web':
         specifier: file:local_modules/@powersync/web
-        version: file:local_modules/@powersync/web(@journeyapps/wa-sqlite@1.2.0)(@powersync/common@1.24.0)
+        version: file:local_modules/@powersync/web(@journeyapps/wa-sqlite@1.2.0)(@powersync/common@file:local_modules/@powersync/common)
       '@supabase/supabase-js':
         specifier: ^2.46.2
         version: 2.46.2
@@ -772,11 +772,12 @@ packages:
   '@popperjs/core@2.11.8':
     resolution: {integrity: sha512-P1st0aksCrn9sGZhp8GMYwBnQsbvAWsZAX44oXNNvLHGqAOcoVxmjZiohstwQ7SqKnbR47akdNi+uleWD8+g6A==}
 
-  '@powersync/common@1.24.0':
-    resolution: {integrity: sha512-SIbODmf5YSUECGa9PhtpBBmJciMomoCyziek10J2W8SiUib1UCJpuBLqZdOous0tdgBUcrYZGe7IJ0OhfYRqSg==}
+  '@powersync/common@file:local_modules/@powersync/common':
+    resolution: {directory: local_modules/@powersync/common, type: directory}
 
   '@powersync/react@1.5.1':
     resolution: {integrity: sha512-x/uKsNOoDzUjdXgCMMrJmpZQMTEpddk64XDjW684bFsld3fqL0t5t3ULOpAHsm1vl/hKh77Xa9nthLUCXpKSgw==}
+    version: 1.5.1
     peerDependencies:
       '@powersync/common': ^1.21.0
       react: '*'
@@ -3455,19 +3456,19 @@ snapshots:
 
   '@popperjs/core@2.11.8': {}
 
-  '@powersync/common@1.24.0':
+  '@powersync/common@file:local_modules/@powersync/common':
     dependencies:
       js-logger: 1.6.1
 
-  '@powersync/react@1.5.1(@powersync/common@1.24.0)(react@18.3.1)':
+  '@powersync/react@1.5.1(@powersync/common@file:local_modules/@powersync/common)(react@18.3.1)':
     dependencies:
-      '@powersync/common': 1.24.0
+      '@powersync/common': file:local_modules/@powersync/common
       react: 18.3.1
 
-  '@powersync/web@file:local_modules/@powersync/web(@journeyapps/wa-sqlite@1.2.0)(@powersync/common@1.24.0)':
+  '@powersync/web@file:local_modules/@powersync/web(@journeyapps/wa-sqlite@1.2.0)(@powersync/common@file:local_modules/@powersync/common)':
     dependencies:
       '@journeyapps/wa-sqlite': 1.2.0
-      '@powersync/common': 1.24.0
+      '@powersync/common': file:local_modules/@powersync/common
       async-mutex: 0.4.1
       bson: 6.10.0
       comlink: 4.4.2

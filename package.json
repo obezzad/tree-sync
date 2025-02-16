@@ -18,7 +18,7 @@
     "@lexical/react": "^0.20.0",
     "@mui/icons-material": "^6.1.9",
     "@mui/material": "^6.1.9",
-    "@powersync/common": "^1.22.2",
+    "@powersync/common": "file:local_modules/@powersync/common",
     "@powersync/react": "^1.5.1",
     "@powersync/web": "file:local_modules/@powersync/web",
     "@supabase/supabase-js": "^2.46.2",
