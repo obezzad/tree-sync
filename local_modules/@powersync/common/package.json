@@ -46,6 +46,7 @@
     "bson": "^6.6.0",
     "buffer": "^6.0.3",
     "can-ndjson-stream": "^1.0.2",
+    "concurrently": "^9.1.2",
     "cross-fetch": "^4.0.0",
     "event-iterator": "^2.0.0",
     "rollup": "4.14.3",
@@ -60,6 +61,7 @@
     "build": "tsc -b && rollup -c rollup.config.mjs",
     "build:prod": "tsc -b --sourceMap false && rollup -c rollup.config.mjs --sourceMap false",
     "clean": "rm -rf lib dist tsconfig.tsbuildinfo node_modules",
-    "test": "vitest"
+    "test": "vitest",
+    "watch": "concurrently \"tsc -b -w\" \"rollup -c rollup.config.mjs -w\""
   }
 }
