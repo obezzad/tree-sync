@@ -39,6 +39,8 @@ export class SharedSyncImplementation extends BaseObserver {
     currentConnectionAbortController;
     pendingConnectionOptions;
     cleanupInProgress;
+    activeConnectionAttempts = new Map(); // Map of connectionId -> {timestamp, controller, options, client}
+
     constructor() {
         super();
         this.ports = [];
@@ -106,93 +108,181 @@ export class SharedSyncImplementation extends BaseObserver {
      * Cleanup of old connections happens in the background.
      */
     async connect(options) {
-        const now = performance.now();
-        console.warn(`[connect] Connect initiated at ${now}`);
+        const timestamp = performance.now();
+        console.warn(`[connect] Connect initiated at ${timestamp}`);
 
-        await this.waitForReady();
-        console.warn(`[connect] Ready after ${performance.now() - now} ms`);
+        // Only wait for ready on first connect, not on reconnects
+        if (!this.syncStreamClient) {
+            await this.waitForReady();
+        } else {
+            // For reconnects, ensure initialization in background but don't block
+            this.waitForReady().catch(err => console.error("Background init error:", err));
+        }
+
+        console.warn(`[connect] Ready after ${performance.now() - timestamp} ms`);
+
+        // Create a unique connection ID
+        const connectionId = `conn-${timestamp}`;
+
+        // Create abort controller for this specific connection attempt
+        const abortController = new AbortController();
 
         // Store the options for this connection request
         this.pendingConnectionOptions = options;
 
-        // Abort any existing connection immediately
+        // Track this connection attempt
+        const connectionAttempt = {
+            timestamp,
+            controller: abortController,
+            options,
+            client: null
+        };
+        this.activeConnectionAttempts.set(connectionId, connectionAttempt);
+
+        // Abort any previous connection attempts
+        for (const [id, attempt] of this.activeConnectionAttempts.entries()) {
+            if (id !== connectionId && !attempt.controller.signal.aborted) {
+                console.warn(`[connect] Aborting older connection attempt ${id}`);
+                attempt.controller.abort(new AbortOperation('Superseded by newer connection request'));
+            }
+        }
+
+        // Also abort the current connection controller for backward compatibility
         if (this.currentConnectionAbortController) {
             this.currentConnectionAbortController.abort(new AbortOperation('Aborting previous connection for new connection request'));
             this.currentConnectionAbortController = null;
         }
 
-        // Create a new abort controller for this connection
-        const abortController = new AbortController();
+        // Update the current connection controller
         this.currentConnectionAbortController = abortController;
 
-        // Start cleanup of old connection in the background if needed
-        this.cleanupOldConnection();
+        // Start connection process immediately without waiting for locks
+        this.performConnect(connectionId, options, timestamp, abortController.signal)
+            .catch(error => console.error(`[connect] Error in connection process:`, error));
 
-        // Try to acquire the lock with ifAvailable option first
-        try {
-            return await getNavigatorLocks().request('shared-sync-connect', { ifAvailable: true }, async () => {
-                // If we got the lock immediately, proceed with connection
-                return this.performConnect(options, now, abortController.signal);
-            });
-        } catch (error) {
-            // If we couldn't get the lock immediately, it means another operation is in progress
-            // We'll create a new connection without waiting for the lock
-            console.warn(`[connect] Lock not immediately available, proceeding without lock`);
-            return this.performConnect(options, now, abortController.signal);
-        }
+        // Return immediately to allow parallel processing
+        return;
     }
 
     /**
      * Performs the actual connection process
      * @private
      */
-    async performConnect(options, startTime, signal) {
-        // Check if this is still the most recent connection request
-        if (this.pendingConnectionOptions !== options) {
-            console.warn(`[connect] Skipping connection as newer request exists`);
-            return;
-        }
-
-        console.warn(`[connect] Performing connection after ${performance.now() - startTime} ms`);
-
-        // Create a new streaming implementation
-        const newSyncClient = this.generateStreamingImplementation();
-
-        // Register status listener
-        newSyncClient.registerListener({
-            statusChanged: (status) => {
-                // Only update statuses if this is still the current client
-                if (this.syncStreamClient === newSyncClient) {
-                    this.updateAllStatuses(status.toJSON());
-                    console.warn(`[connect] Status changed after ${performance.now() - startTime} ms`);
-                }
-            }
-        });
-
+    async performConnect(connectionId, options, startTime, signal) {
         try {
-            // Connect with the provided options
-            await newSyncClient.connect(options);
+            // Check if this connection attempt has been aborted
+            if (signal.aborted) {
+                console.warn(`[connect] Connection ${connectionId} already aborted, skipping`);
+                this.activeConnectionAttempts.delete(connectionId);
+                return;
+            }
 
-            // If this is still the most recent connection request, update the client
-            if (this.pendingConnectionOptions === options && !signal.aborted) {
+            console.warn(`[connect] Performing connection ${connectionId} after ${performance.now() - startTime} ms`);
+
+            // Create a new streaming implementation
+            const newSyncClient = this.generateStreamingImplementation();
+
+            // Store client reference in the connection attempt
+            const connectionAttempt = this.activeConnectionAttempts.get(connectionId);
+            if (connectionAttempt) {
+                connectionAttempt.client = newSyncClient;
+            }
+
+            // Register status listener
+            newSyncClient.registerListener({
+                statusChanged: (status) => {
+                    // Only update statuses if this is the current client
+                    if (this.syncStreamClient === newSyncClient) {
+                        this.updateAllStatuses(status.toJSON());
+                        console.warn(`[connect] Status changed for ${connectionId} after ${performance.now() - startTime} ms`);
+                    }
+                }
+            });
+
+            // Check if this is still the most recent connection attempt
+            const isLatestAttempt = Array.from(this.activeConnectionAttempts.values())
+                .every(attempt => attempt.timestamp <= startTime || attempt.controller.signal.aborted);
+
+            if (isLatestAttempt && !signal.aborted) {
+                console.warn(`[connect] Setting ${connectionId} as active client before connection completes`);
+
+                // Update client reference immediately
                 const oldClient = this.syncStreamClient;
                 this.syncStreamClient = newSyncClient;
                 this.lastConnectOptions = options;
 
-                // If there was a previous client, schedule it for cleanup
+                // Schedule old client for background cleanup
                 if (oldClient) {
-                    this.cleanupOldConnection(oldClient);
+                    this.cleanupClient(oldClient);
+                }
+            }
+
+            // Listen for abort signal
+            signal.addEventListener('abort', () => {
+                console.warn(`[connect] Connection ${connectionId} aborted during connect`);
+                // If this client became the active one but was aborted, we need to handle that
+                if (this.syncStreamClient === newSyncClient) {
+                    // Find the next most recent non-aborted connection attempt
+                    const nextBest = Array.from(this.activeConnectionAttempts.entries())
+                        .filter(([id, attempt]) => id !== connectionId && !attempt.controller.signal.aborted)
+                        .sort((a, b) => b[1].timestamp - a[1].timestamp)[0];
+
+                    if (nextBest) {
+                        console.warn(`[connect] Reverting to next best connection ${nextBest[0]}`);
+                        this.syncStreamClient = nextBest[1].client;
+                    } else {
+                        this.syncStreamClient = null;
+                    }
                 }
 
-                console.warn(`[connect] Connected after ${performance.now() - startTime} ms`);
-            } else {
-                // This connection is no longer needed, clean it up
-                console.warn(`[connect] Connection completed but is no longer needed`);
+                // Clean up this client
+                this.cleanupClient(newSyncClient);
+            });
+
+            // Start connection in background
+            console.warn(`[connect] Starting connection ${connectionId}`);
+
+            try {
+                // Connect with the provided options
+                await newSyncClient.connect(options);
+                console.warn(`[connect] Connection ${connectionId} established after ${performance.now() - startTime}ms`);
+
+                // Check again if this is still the most recent connection
+                if (signal.aborted) {
+                    console.warn(`[connect] Connection ${connectionId} completed but was aborted`);
+                    // Clean up if aborted during connection
+                    if (this.syncStreamClient === newSyncClient) {
+                        this.syncStreamClient = null;
+                    }
+                    this.cleanupClient(newSyncClient);
+                } else if (this.syncStreamClient !== newSyncClient) {
+                    // This connection is no longer the active client
+                    console.warn(`[connect] Connection ${connectionId} completed but is no longer the active client`);
+                    this.cleanupClient(newSyncClient);
+                }
+            } catch (error) {
+                console.error(`[connect] Connection ${connectionId} failed:`, error);
+                // If this is the current client, we need to handle the error
+                if (this.syncStreamClient === newSyncClient) {
+                    // Find the next most recent non-aborted connection attempt
+                    const nextBest = Array.from(this.activeConnectionAttempts.entries())
+                        .filter(([id, attempt]) => id !== connectionId && !attempt.controller.signal.aborted)
+                        .sort((a, b) => b[1].timestamp - a[1].timestamp)[0];
+
+                    if (nextBest) {
+                        console.warn(`[connect] Reverting to next best connection ${nextBest[0]} after error`);
+                        this.syncStreamClient = nextBest[1].client;
+                    } else {
+                        this.syncStreamClient = null;
+                    }
+                }
+
+                // Clean up this client
                 this.cleanupClient(newSyncClient);
             }
-        } catch (error) {
-            console.error(`[connect] Connection failed:`, error);
-            // Don't throw the error, as a new connection attempt might already be in progress
+        } finally {
+            // Clean up tracking
+            this.activeConnectionAttempts.delete(connectionId);
         }
     }
 
@@ -209,17 +299,24 @@ export class SharedSyncImplementation extends BaseObserver {
         this.cleanupInProgress = true;
 
         // Use a separate lock for cleanup to allow it to happen in the background
-        getNavigatorLocks().request('shared-sync-cleanup', async () => {
+        // Use ifAvailable to ensure we don't block if the lock is not available
+        getNavigatorLocks().request('shared-sync-cleanup', { ifAvailable: true }, async () => {
             try {
                 const clientToCleanup = specificClient || this.syncStreamClient;
                 if (clientToCleanup && clientToCleanup !== this.syncStreamClient) {
-                    await this.cleanupClient(clientToCleanup);
+                    this.cleanupClient(clientToCleanup);
                 }
             } finally {
                 if (!specificClient) {
                     this.cleanupInProgress = false;
                 }
             }
+        }).catch(() => {
+            // If we couldn't get the lock, schedule cleanup for later
+            setTimeout(() => {
+                this.cleanupInProgress = false;
+                this.cleanupOldConnection(specificClient);
+            }, 100);
         });
     }
 
@@ -227,16 +324,25 @@ export class SharedSyncImplementation extends BaseObserver {
      * Cleans up a specific client
      * @private
      */
-    async cleanupClient(client) {
+    cleanupClient(client) {
         if (!client) return;
 
-        try {
-            await client.disconnect();
-            await client.dispose();
-        } catch (error) {
-            console.warn(`[cleanup] Error during client cleanup:`, error);
-        }
+        // Use setTimeout to ensure this runs completely asynchronously
+        setTimeout(() => {
+            try {
+                // Don't await these - fire and forget
+                client.disconnect().catch(e => console.warn("Disconnect error:", e));
+
+                // Use another setTimeout to ensure dispose happens after disconnect has a chance to start
+                setTimeout(() => {
+                    client.dispose().catch(e => console.warn("Dispose error:", e));
+                }, 0);
+            } catch (error) {
+                console.warn(`[cleanup] Error during client cleanup:`, error);
+            }
+        }, 0);
     }
+
     async disconnect() {
         const now = performance.now();
         console.warn(`[disconnect] Disconnect initiated at ${now}`);
@@ -345,16 +451,21 @@ export class SharedSyncImplementation extends BaseObserver {
         this.waitForReady().then(() => this.syncStreamClient?.triggerCrudUpload());
     }
     async obtainLock(lockOptions) {
-        await this.waitForReady();
-        return this.syncStreamClient.obtainLock(lockOptions);
+        // Don't wait for ready
+        this.waitForReady().catch(err => console.error("Background init error:", err));
+
+        // Forward to sync client immediately if available
+        return this.syncStreamClient?.obtainLock(lockOptions) || Promise.resolve();
     }
     async hasCompletedSync() {
-        await this.waitForReady();
-        return this.syncStreamClient.hasCompletedSync();
+        // Don't block on waitForReady
+        this.waitForReady().catch(err => console.error("Background init error:", err));
+        return this.syncStreamClient?.hasCompletedSync() || Promise.resolve(false);
     }
     async getWriteCheckpoint() {
-        await this.waitForReady();
-        return this.syncStreamClient.getWriteCheckpoint();
+        // Don't block on waitForReady
+        this.waitForReady().catch(err => console.error("Background init error:", err));
+        return this.syncStreamClient?.getWriteCheckpoint() || Promise.resolve(null);
     }
     generateStreamingImplementation() {
         // This should only be called after initialization has completed
