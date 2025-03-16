@@ -1,14 +1,15 @@
 bucket_definitions:
-  user_nodes:
+  full_replication:
+    accept_potentially_dangerous_queries: true
     parameters:
-        - SELECT request.jwt() ->> 'user_metadata.local_id' as local_user_id WHERE (request.parameters() ->> 'selected_nodes') IS NULL
+        - SELECT (request.parameters() ->> 'user') as local_user_id
     data:
         - SELECT * FROM nodes WHERE user_id = bucket.local_user_id
-  selected_nodes:
+  partial_replication:
+    accept_potentially_dangerous_queries: true
+    priority: 0
     parameters:
-        - SELECT parent_id as node_id FROM nodes WHERE id IN (request.parameters() ->> 'selected_nodes') AND user_id = (request.jwt() ->> 'user_metadata.local_id')
-        - SELECT id as node_id FROM nodes WHERE id IN (request.parameters() ->> 'selected_nodes') AND user_id = (request.jwt() ->> 'user_metadata.local_id')
-        - SELECT id as node_id FROM nodes WHERE parent_id IN (request.parameters() ->> 'selected_nodes') AND user_id = (request.jwt() ->> 'user_metadata.local_id')
+        - SELECT id as node_id FROM nodes WHERE id IN (request.parameters() ->> 'selected_nodes') AND user_id = (request.parameters() ->> 'user')
     data:
-        - SELECT * FROM nodes WHERE id = bucket.node_id
-        - SELECT * FROM nodes WHERE parent_id = bucket.node_id
+        - SELECT id, parent_id, user_id, payload, created_at, archived_at FROM nodes WHERE id = bucket.node_id
+        - SELECT id, parent_id, user_id, payload, created_at, archived_at FROM nodes WHERE parent_id = bucket.node_id
