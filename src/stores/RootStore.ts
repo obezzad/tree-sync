@@ -72,7 +72,7 @@ export class RootStore {
     );
 
     reaction(
-      () => [this._syncedNodes, this.isAuthenticated, this.isOfflineMode],
+      () => [this.isAuthenticated, this.isOfflineMode],
       () => {
         console.log(
           "%cReconnect DB",
@@ -81,6 +81,17 @@ export class RootStore {
         this.connectDb();
       },
     );
+
+    reaction(
+      () => [this._syncedNodes],
+      () => {
+        console.log(
+          "%cReconnect Partial DB",
+          "color: lime"
+        )
+        this.connectPartialDb();
+      }
+    )
   }
 
   private initialize() {
@@ -117,6 +128,8 @@ export class RootStore {
     }
 
     this.restoreSession();
+
+    this.connectDb();
   }
 
   private initializePowerSync() {
@@ -271,7 +284,7 @@ export class RootStore {
     });
   }
 
-  async connectDb() {
+  async connectPartialDb() {
     if (!this.isAuthenticated || this.isOfflineMode) {
       return;
     }
@@ -289,6 +302,21 @@ export class RootStore {
       measureOnce(METRICS.TIME_TO_PARTIAL_REPLICATION);
     });
 
+    if (this.isPartialSync && (await this.db?.getUploadQueueStats())?.count) {
+      this.partialDb?.connect(backendConnector, {
+        params: {
+          user: userService.getUserId(),
+          selected_nodes
+        }
+      });
+    };
+  }
+
+  async connectFullDb() {
+    if (!this.isAuthenticated || this.isOfflineMode) {
+      return;
+    }
+
     this.fullDb?.connect(backendConnector, {
       params: {
         user: userService.getUserId()
@@ -299,22 +327,18 @@ export class RootStore {
       measureOnce(METRICS.TIME_TO_FULL_REPLICATION);
     });
 
-    if ((await this.db?.getUploadQueueStats())?.count) {
-      if (this.isPartialSync) {
-        this.partialDb?.connect(backendConnector, {
-          params: {
-            user: userService.getUserId(),
-            selected_nodes
-          }
-        });
-      } else {
-        this.fullDb?.connect(backendConnector, {
-          params: {
-            user: userService.getUserId()
-          }
-        });
-      }
-    }
+    if (!this.isPartialSync && (await this.db?.getUploadQueueStats())?.count) {
+      this.fullDb?.connect(backendConnector, {
+        params: {
+          user: userService.getUserId()
+        }
+      })
+    };
+  }
+
+  async connectDb() {
+    this.connectPartialDb();
+    this.connectFullDb();
   }
 
   setOfflineMode(enabled: boolean) {
