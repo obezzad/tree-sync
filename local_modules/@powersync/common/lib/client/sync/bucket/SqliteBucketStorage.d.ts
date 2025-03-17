@@ -37,14 +37,14 @@ export declare class SqliteBucketStorage extends BaseObserver<BucketStorageListe
      */
     private deleteBucket;
     hasCompletedSync(): Promise<boolean>;
-    syncLocalDatabase(checkpoint: Checkpoint): Promise<SyncLocalDatabaseResult>;
+    syncLocalDatabase(checkpoint: Checkpoint, priority?: number): Promise<SyncLocalDatabaseResult>;
     /**
      * Atomically update the local state to the current checkpoint.
      *
      * This includes creating new tables, dropping old tables, and copying data over from the oplog.
      */
     private updateObjectsFromBuckets;
-    validateChecksums(checkpoint: Checkpoint): Promise<SyncLocalDatabaseResult>;
+    validateChecksums(checkpoint: Checkpoint, priority: number | undefined): Promise<SyncLocalDatabaseResult>;
     /**
      * Force a compact, for tests.
      */

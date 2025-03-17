@@ -2,6 +2,10 @@ import { BaseListener, BaseObserver, Disposable } from '../../../utils/BaseObser
 import { CrudBatch } from './CrudBatch.js';
 import { CrudEntry, OpId } from './CrudEntry.js';
 import { SyncDataBatch } from './SyncDataBatch.js';
+export interface BucketDescription {
+    name: string;
+    priority: number;
+}
 export interface Checkpoint {
     last_op_id: OpId;
     buckets: BucketChecksum[];
@@ -25,6 +29,7 @@ export interface SyncLocalDatabaseResult {
 }
 export interface BucketChecksum {
     bucket: string;
+    priority?: number;
     /**
      * 32-bit unsigned hash.
      */
@@ -51,7 +56,7 @@ export interface BucketStorageAdapter extends BaseObserver<BucketStorageListener
     setTargetCheckpoint(checkpoint: Checkpoint): Promise<void>;
     startSession(): void;
     getBucketStates(): Promise<BucketState[]>;
-    syncLocalDatabase(checkpoint: Checkpoint): Promise<{
+    syncLocalDatabase(checkpoint: Checkpoint, priority?: number): Promise<{
         checkpointValid: boolean;
         ready: boolean;
         failures?: any[];

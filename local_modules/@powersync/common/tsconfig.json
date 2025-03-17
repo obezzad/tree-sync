@@ -1,15 +1,19 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "ESNext",
-    "moduleResolution": "node",
+    "baseUrl": "./",
+    "jsx": "react",
+    "types": ["node"],
+    "rootDir": "src",
+    "outDir": "./lib",
+    "lib": ["esnext"],
     "declaration": true,
-    "outDir": "./dist",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
+    "preserveConstEnums": true,
+    "esModuleInterop": false,
+    "skipLibCheck": false,
+    "strictNullChecks": true,
+    "resolveJsonModule": true
   },
-  "include": ["lib/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*"]
 }

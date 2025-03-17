@@ -1,6 +1,6 @@
 {
   "name": "@powersync/common",
-  "version": "1.24.0",
+  "version": "1.25.0",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public"
@@ -31,8 +31,16 @@
     "url": "https://github.com/powersync-ja/powersync-js/issues"
   },
   "homepage": "https://docs.powersync.com",
+  "scripts": {
+    "build": "tsc -b && rollup -c rollup.config.mjs",
+    "build:prod": "tsc -b --sourceMap false && rollup -c rollup.config.mjs --sourceMap false",
+    "clean": "rm -rf lib dist tsconfig.tsbuildinfo node_modules",
+    "test": "vitest"
+  },
   "dependencies": {
-    "js-logger": "^1.6.1",
+    "js-logger": "^1.6.1"
+  },
+  "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.7",
     "@rollup/plugin-inject": "^5.0.5",
     "@rollup/plugin-json": "^6.1.0",
@@ -44,22 +52,12 @@
     "bson": "^6.6.0",
     "buffer": "^6.0.3",
     "can-ndjson-stream": "^1.0.2",
-    "concurrently": "^9.1.2",
     "cross-fetch": "^4.0.0",
     "event-iterator": "^2.0.0",
     "rollup": "4.14.3",
     "rsocket-core": "1.0.0-alpha.3",
     "rsocket-websocket-client": "1.0.0-alpha.3",
     "text-encoding": "^0.7.0",
-    "typescript": "^5.5.3",
-    "vitest": "^2.0.5",
     "web-streams-polyfill": "3.2.1"
-  },
-  "scripts": {
-    "build": "tsc -b && rollup -c rollup.config.mjs",
-    "build:prod": "tsc -b --sourceMap false && rollup -c rollup.config.mjs --sourceMap false",
-    "clean": "rm -rf lib dist tsconfig.tsbuildinfo node_modules",
-    "test": "vitest",
-    "watch": "concurrently \"tsc -b -w\" \"rollup -c rollup.config.mjs -w\""
   }
 }

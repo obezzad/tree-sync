@@ -99,6 +99,7 @@ export interface StreamingSyncImplementation extends BaseObserver<StreamingSyncI
     triggerCrudUpload: () => void;
     waitForReady(): Promise<void>;
     waitForStatus(status: SyncStatusOptions): Promise<void>;
+    waitUntilStatusMatches(predicate: (status: SyncStatus) => boolean): Promise<void>;
 }
 export declare const DEFAULT_CRUD_UPLOAD_THROTTLE_MS = 1000;
 export declare const DEFAULT_RETRY_DELAY_MS = 5000;
@@ -120,6 +121,7 @@ export declare abstract class AbstractStreamingSyncImplementation extends BaseOb
     constructor(options: AbstractStreamingSyncImplementationOptions);
     waitForReady(): Promise<void>;
     waitForStatus(status: SyncStatusOptions): Promise<void>;
+    waitUntilStatusMatches(predicate: (status: SyncStatus) => boolean): Promise<void>;
     get lastSyncedAt(): Date | undefined;
     get isConnected(): boolean;
     protected get logger(): Logger.ILogger;
@@ -134,6 +136,7 @@ export declare abstract class AbstractStreamingSyncImplementation extends BaseOb
      * @deprecated use [connect instead]
      */
     streamingSync(signal?: AbortSignal, options?: PowerSyncConnectionOptions): Promise<void>;
+    private collectLocalBucketState;
     protected streamingSyncIteration(signal: AbortSignal, options?: PowerSyncConnectionOptions): Promise<{
         retry?: boolean;
     }>;

@@ -10,7 +10,7 @@ import { PowerSyncBackendConnector } from './connection/PowerSyncBackendConnecto
 import { BucketStorageAdapter } from './sync/bucket/BucketStorageAdapter.js';
 import { CrudBatch } from './sync/bucket/CrudBatch.js';
 import { CrudTransaction } from './sync/bucket/CrudTransaction.js';
-import { type AdditionalConnectionOptions, type PowerSyncConnectionOptions, StreamingSyncImplementation, StreamingSyncImplementationListener, type RequiredAdditionalConnectionOptions } from './sync/stream/AbstractStreamingSyncImplementation.js';
+import { StreamingSyncImplementation, StreamingSyncImplementationListener, type AdditionalConnectionOptions, type PowerSyncConnectionOptions, type RequiredAdditionalConnectionOptions } from './sync/stream/AbstractStreamingSyncImplementation.js';
 export interface DisconnectAndClearOptions {
     /** When set to false, data in local-only tables is preserved. */
     clearLocal?: boolean;
@@ -153,9 +153,18 @@ export declare abstract class AbstractPowerSyncDatabase extends BaseObserver<Pow
      */
     waitForReady(): Promise<void>;
     /**
+     * Wait for the first sync operation to complete.
+     *
+     * @argument request Either an abort signal (after which the promise will complete regardless of
+     * whether a full sync was completed) or an object providing an abort signal and a priority target.
+     * When a priority target is set, the promise may complete when all buckets with the given (or higher)
+     * priorities have been synchronized. This can be earlier than a complete sync.
      * @returns A promise which will resolve once the first full sync has completed.
      */
-    waitForFirstSync(signal?: AbortSignal): Promise<void>;
+    waitForFirstSync(request?: AbortSignal | {
+        signal?: AbortSignal;
+        priority?: number;
+    }): Promise<void>;
     /**
      * Allows for extended implementations to execute custom initialization
      * logic as part of the total init process
