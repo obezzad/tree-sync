@@ -1,4 +1,4 @@
-import { autorun, makeAutoObservable, reaction, runInAction } from 'mobx';
+import { makeAutoObservable, reaction, runInAction } from 'mobx';
 import { PowerSyncDatabase, WASQLiteOpenFactory, WASQLiteVFS } from '@powersync/web';
 import { AppSchema } from '@/library/powersync/AppSchema';
 import backendConnector from '@/library/powersync/BackendConnector';
@@ -13,7 +13,6 @@ const STORAGE_KEYS = {
   SESSION: 'tree-sync-session',
   STATE: 'tree-sync-state',
   OFFLINE_MODE: 'tree-sync-offline-mode',
-  PARTIAL_SYNC: 'tree-sync-partial-sync',
   SHOW_ARCHIVED: 'tree-sync-show-archived'
 } as const;
 
@@ -22,22 +21,19 @@ interface PersistedState {
   isAuthReady: boolean;
   isInitializing: boolean;
   isOfflineMode: boolean;
-  isPartialSync: boolean;
   showArchivedNodes: boolean;
   isFocusedView: boolean;
   _syncedNodes?: string[];
 }
 
 export class RootStore {
-  private partialDb: PowerSyncDatabase | null = null;
-  private fullDb: PowerSyncDatabase | null = null;
+  db: PowerSyncDatabase | null = null;
   seed: string | null = null;
   session: Session | null = null;
   isInitializing = false;
   isPowerSyncReady = false;
   isAuthReady = false;
   isOfflineMode = false;
-  isPartialSync = true;
   showArchivedNodes = true;
   isFocusedView = false;
   selectedNodeId: string | null = null;
@@ -86,10 +82,10 @@ export class RootStore {
       () => [this._syncedNodes],
       () => {
         console.log(
-          "%cReconnect Partial DB",
+          "%cReconnect DB with updated nodes",
           "color: lime"
         )
-        this.connectPartialDb();
+        this.connectDb();
       }
     )
   }
@@ -113,13 +109,6 @@ export class RootStore {
       });
     }
 
-    const storedPartialSync = localStorage.getItem(STORAGE_KEYS.PARTIAL_SYNC);
-    if (storedPartialSync) {
-      runInAction(() => {
-        this.isPartialSync = storedPartialSync === 'true';
-      });
-    }
-
     const storedShowArchived = localStorage.getItem(STORAGE_KEYS.SHOW_ARCHIVED);
     if (storedShowArchived) {
       runInAction(() => {
@@ -133,30 +122,14 @@ export class RootStore {
   }
 
   private initializePowerSync() {
-    this.fullDb = new PowerSyncDatabase({
+    this.db = new PowerSyncDatabase({
       database: new WASQLiteOpenFactory({
-        dbFilename: 'full.db',
+        dbFilename: 'powersync.db',
         vfs: WASQLiteVFS.OPFSCoopSyncVFS,
         flags: {
           enableMultiTabs: typeof SharedWorker !== 'undefined',
           disableSSRWarning: true,
         }
-      }),
-      schema: AppSchema,
-      flags: {
-        enableMultiTabs: typeof SharedWorker !== 'undefined',
-        disableSSRWarning: true,
-      }
-    });
-
-    this.partialDb = new PowerSyncDatabase({
-      database: new WASQLiteOpenFactory({
-        dbFilename: 'partial.db',
-        vfs: WASQLiteVFS.OPFSCoopSyncVFS,
-        flags: {
-          enableMultiTabs: typeof SharedWorker !== 'undefined',
-          disableSSRWarning: true,
-        },
       }),
       schema: AppSchema,
       flags: {
@@ -172,7 +145,6 @@ export class RootStore {
       isAuthReady: this.isAuthReady,
       isInitializing: this.isInitializing,
       isOfflineMode: this.isOfflineMode,
-      isPartialSync: this.isPartialSync,
       showArchivedNodes: this.showArchivedNodes,
       isFocusedView: this.isFocusedView,
       _syncedNodes: this._syncedNodes
@@ -192,7 +164,6 @@ export class RootStore {
           this.isAuthReady = state.isAuthReady;
           this.isInitializing = state.isInitializing;
           this.isOfflineMode = state.isOfflineMode;
-          this.isPartialSync = state.isPartialSync;
           this.showArchivedNodes = state.showArchivedNodes;
           this.isFocusedView = state.isFocusedView;
           this._syncedNodes = state._syncedNodes || [];
@@ -284,61 +255,23 @@ export class RootStore {
     });
   }
 
-  async connectPartialDb() {
+  async connectDb() {
     if (!this.isAuthenticated || this.isOfflineMode) {
       return;
     }
 
     const selected_nodes = [...this._syncedNodes];
 
-    this.partialDb?.connect(backendConnector, {
+    this.db?.connect(backendConnector, {
       params: {
         user: userService.getUserId(),
         selected_nodes
       }
-    })
+    });
 
-    this.partialDb?.waitForFirstSync().then(() => {
+    this.db?.waitForFirstSync().then(() => {
       measureOnce(METRICS.TIME_TO_PARTIAL_REPLICATION);
     });
-
-    if (this.isPartialSync && (await this.db?.getUploadQueueStats())?.count) {
-      this.partialDb?.connect(backendConnector, {
-        params: {
-          user: userService.getUserId(),
-          selected_nodes
-        }
-      });
-    };
-  }
-
-  async connectFullDb() {
-    if (!this.isAuthenticated || this.isOfflineMode) {
-      return;
-    }
-
-    this.fullDb?.connect(backendConnector, {
-      params: {
-        user: userService.getUserId()
-      }
-    })
-
-    this.fullDb?.waitForFirstSync().then(() => {
-      measureOnce(METRICS.TIME_TO_FULL_REPLICATION);
-    });
-
-    if (!this.isPartialSync && (await this.db?.getUploadQueueStats())?.count) {
-      this.fullDb?.connect(backendConnector, {
-        params: {
-          user: userService.getUserId()
-        }
-      })
-    };
-  }
-
-  async connectDb() {
-    this.connectPartialDb();
-    this.connectFullDb();
   }
 
   setOfflineMode(enabled: boolean) {
@@ -350,18 +283,9 @@ export class RootStore {
 
     if (this.db) {
       if (enabled) {
-        this.partialDb?.disconnect();
-        this.fullDb?.disconnect();
+        this.db?.disconnect();
       }
     }
-  }
-
-  setPartialSync(enabled: boolean) {
-    runInAction(() => {
-      this.isPartialSync = enabled;
-      localStorage.setItem(STORAGE_KEYS.PARTIAL_SYNC, enabled.toString());
-      this.persistState();
-    });
   }
 
   private async initializeWithSeed(seed: string, session: Session) {
@@ -427,8 +351,7 @@ export class RootStore {
         this.isInitializing = true;
       });
 
-      await this.partialDb?.disconnectAndClear();
-      await this.fullDb?.disconnectAndClear();
+      await this.db?.disconnectAndClear();
       reset();
       localStorage.removeItem(STORAGE_KEYS.STATE);
       authService.clearSession();
@@ -456,16 +379,6 @@ export class RootStore {
     } catch (error) {
       console.error('Clear all failed:', error);
     }
-  }
-
-  get db() {
-    const _db = this.isPartialSync ? this.partialDb : this.fullDb;
-
-    if (typeof window !== 'undefined') {
-      window.db = _db;
-    }
-
-    return _db;
   }
 
   get isAuthenticated() {

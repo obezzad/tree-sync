@@ -33,7 +33,7 @@ export const TreeNode = observer(({
   isExpanded = true,
   onToggleExpand
 }: TreeNodeProps) => {
-  const wasSelected = rootStore.isPartialSync && rootStore._syncedNodes.includes(node.id);
+  const wasSelected = rootStore._syncedNodes.includes(node.id);
   const isSelected = rootStore.selectedNodeId === node.id;
   const [isHovered, setIsHovered] = useState(false);
   const [dragOverPosition, setDragOverPosition] = useState<'before' | 'after' | 'inside' | null>(null);

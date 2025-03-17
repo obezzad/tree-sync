@@ -45,6 +45,5 @@ export function reset() {
 
 export const METRICS = {
   TIME_TO_INTERACTION: "Time to Interaction",
-  TIME_TO_PARTIAL_REPLICATION: "Time to Replication; Partial",
-  TIME_TO_FULL_REPLICATION: "Time to Replication; Full",
+  TIME_TO_PARTIAL_REPLICATION: "Time to Replication",
 } as const
