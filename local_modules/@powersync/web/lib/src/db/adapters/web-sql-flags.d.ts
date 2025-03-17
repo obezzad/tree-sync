@@ -39,6 +39,7 @@ export interface ResolvedWebSQLOpenOptions extends SQLOpenOptions {
      * Setting this to `FILESYSTEM` can cause issues with larger queries or datasets.
      */
     temporaryStorage: TemporaryStorageOption;
+    cacheSizeKb: number;
     /**
      * Encryption key for the database.
      * If set, the database will be encrypted using ChaCha20.
@@ -49,6 +50,7 @@ export declare enum TemporaryStorageOption {
     MEMORY = "memory",
     FILESYSTEM = "file"
 }
+export declare const DEFAULT_CACHE_SIZE_KB: number;
 /**
  * Options for opening a Web SQL connection
  */
@@ -65,8 +67,16 @@ export interface WebSQLOpenFactoryOptions extends SQLOpenOptions {
     /**
      * Where to store SQLite temporary files. Defaults to 'MEMORY'.
      * Setting this to `FILESYSTEM` can cause issues with larger queries or datasets.
+     *
+     * For details, see: https://www.sqlite.org/pragma.html#pragma_temp_store
      */
     temporaryStorage?: TemporaryStorageOption;
+    /**
+     * Maximum SQLite cache size. Defaults to 50MB.
+     *
+     * For details, see: https://www.sqlite.org/pragma.html#pragma_cache_size
+     */
+    cacheSizeKb?: number;
     /**
      * Encryption key for the database.
      * If set, the database will be encrypted using ChaCha20.

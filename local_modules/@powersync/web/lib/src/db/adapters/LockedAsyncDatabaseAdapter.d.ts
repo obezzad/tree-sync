@@ -57,7 +57,7 @@ export declare class LockedAsyncDatabaseAdapter extends BaseObserver<LockedAsync
      * Shared workers might not actually close the connection if other
      * tabs are still using it.
      */
-    close(): void;
+    close(): Promise<void>;
     getAll<T>(sql: string, parameters?: any[] | undefined): Promise<T[]>;
     getOptional<T>(sql: string, parameters?: any[] | undefined): Promise<T | null>;
     get<T>(sql: string, parameters?: any[] | undefined): Promise<T>;

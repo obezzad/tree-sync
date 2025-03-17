@@ -61,10 +61,10 @@
   "license": "Apache-2.0",
   "peerDependencies": {
     "@journeyapps/wa-sqlite": "^1.2.2",
-    "@powersync/common": "workspace:^1.25.0"
+    "@powersync/common": "^1.25.0"
   },
   "dependencies": {
-    "@powersync/common": "workspace:*",
+    "@powersync/common": "^1.25.0",
     "async-mutex": "^0.4.0",
     "bson": "^6.6.0",
     "comlink": "^4.4.2",

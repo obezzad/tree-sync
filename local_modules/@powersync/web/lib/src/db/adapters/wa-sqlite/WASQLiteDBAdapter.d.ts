@@ -17,6 +17,7 @@ export interface WASQLiteDBAdapterOptions extends Omit<PowerSyncOpenFactoryOptio
     worker?: string | URL | ((options: ResolvedWebSQLOpenOptions) => Worker | SharedWorker);
     vfs?: WASQLiteVFS;
     temporaryStorage?: TemporaryStorageOption;
+    cacheSizeKb?: number;
     /**
      * Encryption key for the database.
      * If set, the database will be encrypted using multiple-ciphers.

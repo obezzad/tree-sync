@@ -61,10 +61,20 @@ export declare class SharedSyncImplementation extends BaseObserver<SharedSyncImp
     protected syncParams: SharedSyncInitOptions | null;
     protected logger: ILogger;
     protected lastConnectOptions: PowerSyncConnectionOptions | undefined;
+    protected currentConnectionAbortController: AbortController | null;
+    protected pendingConnectionOptions: PowerSyncConnectionOptions | null;
+    protected cleanupInProgress: boolean;
+    protected activeConnectionAttempts: Map<string, {
+        timestamp: number;
+        controller: AbortController;
+        options?: PowerSyncConnectionOptions;
+        client: AbstractStreamingSyncImplementation | null;
+    }>;
     syncStatus: SyncStatus;
     broadCastLogger: ILogger;
     constructor();
     waitForStatus(status: SyncStatusOptions): Promise<void>;
+    waitUntilStatusMatches(predicate: (status: SyncStatus) => boolean): Promise<void>;
     get lastSyncedAt(): Date | undefined;
     get isConnected(): boolean;
     waitForReady(): Promise<void>;
@@ -72,15 +82,36 @@ export declare class SharedSyncImplementation extends BaseObserver<SharedSyncImp
      * Configures the DBAdapter connection and a streaming sync client.
      */
     setParams(params: SharedSyncInitOptions): Promise<void>;
-    dispose(): Promise<void | undefined>;
+    dispose(): Promise<any>;
     /**
      * Connects to the PowerSync backend instance.
      * Multiple tabs can safely call this in their initialization.
-     * The connection will simply be reconnected whenever a new tab
-     * connects.
+     * This implementation prioritizes new connection requests by aborting
+     * any existing connection and starting a new one immediately.
+     * Cleanup of old connections happens in the background.
      */
-    connect(options?: PowerSyncConnectionOptions): Promise<any>;
+    connect(options?: PowerSyncConnectionOptions): Promise<void>;
+    /**
+     * Performs the actual connection process
+     * @private
+     */
+    private performConnect;
+    /**
+     * Cleans up old connections in the background
+     * @private
+     */
+    private cleanupOldConnection;
+    /**
+     * Cleans up a specific client
+     * @private
+     */
+    private cleanupClient;
     disconnect(): Promise<any>;
+    /**
+     * Performs the actual disconnection process
+     * @private
+     */
+    private performDisconnect;
     /**
      * Adds a new client tab's message port to the list of connected ports
      */

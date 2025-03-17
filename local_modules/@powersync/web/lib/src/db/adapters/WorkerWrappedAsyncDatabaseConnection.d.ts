@@ -20,6 +20,7 @@ export type WrappedWorkerConnectionOptions<Config extends ResolvedWebSQLOpenOpti
  */
 export declare class WorkerWrappedAsyncDatabaseConnection<Config extends ResolvedWebSQLOpenOptions = ResolvedWebSQLOpenOptions> implements AsyncDatabaseConnection {
     protected options: WrappedWorkerConnectionOptions<Config>;
+    protected lockAbortController: AbortController;
     constructor(options: WrappedWorkerConnectionOptions<Config>);
     protected get baseConnection(): AsyncDatabaseConnection<ResolvedWebSQLOpenOptions>;
     init(): Promise<void>;

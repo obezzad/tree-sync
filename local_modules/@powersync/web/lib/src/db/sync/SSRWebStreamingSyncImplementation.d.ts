@@ -26,6 +26,10 @@ export declare class SSRStreamingSyncImplementation extends BaseObserver impleme
      */
     waitForStatus(status: SyncStatusOptions): Promise<void>;
     /**
+     * This will never resolve in SSR Mode.
+     */
+    waitUntilStatusMatches(_predicate: (status: SyncStatus) => boolean): Promise<void>;
+    /**
      * Returns a placeholder checkpoint. This should not be used.
      */
     getWriteCheckpoint(): Promise<string>;

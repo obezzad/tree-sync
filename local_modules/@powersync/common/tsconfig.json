@@ -7,6 +7,7 @@
     "outDir": "./lib",
     "lib": ["esnext"],
     "declaration": true,
+    "composite": true,
     "module": "NodeNext",
     "moduleResolution": "nodenext",
     "preserveConstEnums": true,
