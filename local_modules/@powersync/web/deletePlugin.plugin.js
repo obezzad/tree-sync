@@ -1,6 +1,7 @@
-const path = require('path');
-const fs = require('fs');
-const glob = require('glob');
+import path from 'path';
+import fs from 'fs';
+import * as globModule from 'glob';
+const glob = globModule.default || globModule;
 
 // Deletes all files matching the pattern lib_src_worker_*, we are assuming that the workers will be generated twice (once from tsc and once from webpack)
 class DeleteAssetsPlugin {
@@ -22,4 +23,4 @@ class DeleteAssetsPlugin {
   }
 }
 
-module.exports = DeleteAssetsPlugin;
+export default DeleteAssetsPlugin;

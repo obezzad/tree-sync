@@ -1,6 +1,7 @@
 {
   "name": "@powersync/web",
   "version": "1.15.0",
+  "type": "module",
   "description": "PowerSync web SDK. Sync Postgres, MongoDB or MySQL with SQLite in your web app",
   "main": "lib/src/index.js",
   "types": "lib/src/index.d.ts",
@@ -66,7 +67,7 @@
   "dependencies": {
     "@powersync/common": "^1.25.0",
     "async-mutex": "^0.4.0",
-    "bson": "^6.6.0",
+    "bson": "^6.10.3",
     "comlink": "^4.4.2",
     "commander": "^12.1.0",
     "js-logger": "^1.6.1"
@@ -75,6 +76,7 @@
     "@journeyapps/wa-sqlite": "^1.2.2",
     "@types/uuid": "^9.0.6",
     "crypto-browserify": "^3.12.0",
+    "glob": "^11.0.1",
     "p-defer": "^4.0.1",
     "source-map-loader": "^5.0.0",
     "stream-browserify": "^3.0.0",
@@ -83,6 +85,7 @@
     "vite": "^6.1.0",
     "vite-plugin-top-level-await": "^1.4.4",
     "vite-plugin-wasm": "^3.3.0",
+    "vitest": "^1.6.1",
     "vm-browserify": "^1.1.2",
     "webpack": "^5.90.1",
     "webpack-cli": "^5.1.4",

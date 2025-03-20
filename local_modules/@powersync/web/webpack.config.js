@@ -1,10 +1,16 @@
 const production = process.env.NODE_ENV === 'production';
-const TerserPlugin = require('terser-webpack-plugin');
-const path = require('path');
-const DeleteAssetsPlugin = require('./deletePlugin.plugin');
-const LimitChunkCountPlugin = require('webpack/lib/optimize/LimitChunkCountPlugin');
+import TerserPlugin from 'terser-webpack-plugin';
+import path from 'path';
+import DeleteAssetsPlugin from './deletePlugin.plugin.js';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import webpack from 'webpack';
 
-module.exports = () => {
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const { LimitChunkCountPlugin } = webpack.optimize;
+
+export default () => {
   return {
     entry: path.join(__dirname, './lib/src/index.js'),
     output: {
@@ -28,12 +34,12 @@ module.exports = () => {
     resolve: {
       extensions: ['.tsx', '.ts', '.js'],
       fallback: {
-        crypto: require.resolve('crypto-browserify'),
-        stream: require.resolve('stream-browserify'),
-        vm: require.resolve('vm-browserify')
+        crypto: 'crypto-browserify',
+        stream: 'stream-browserify',
+        vm: 'vm-browserify'
       },
       alias: {
-        bson: path.resolve(__dirname, '../../node_modules/bson/lib/bson.cjs')
+        bson: path.resolve(__dirname, 'node_modules/bson/lib/bson.cjs')
       }
     },
 

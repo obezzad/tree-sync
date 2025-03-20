@@ -1,9 +1,14 @@
 const production = process.env.NODE_ENV === 'production';
-const TerserPlugin = require('terser-webpack-plugin');
-const path = require('path');
-const DeleteAssetsPlugin = require('./deletePlugin.plugin');
+import TerserPlugin from 'terser-webpack-plugin';
+import path from 'path';
+import DeleteAssetsPlugin from './deletePlugin.plugin.js';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
-module.exports = () => {
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+export default () => {
   return {
     entry: {
       SharedSyncImplementation: path.join(__dirname, './lib/src/worker/sync/SharedSyncImplementation.worker.js'),
@@ -33,9 +38,12 @@ module.exports = () => {
     resolve: {
       extensions: ['.tsx', '.ts', '.js'],
       fallback: {
-        crypto: require.resolve('crypto-browserify'),
-        stream: require.resolve('stream-browserify'),
-        vm: require.resolve('vm-browserify')
+        crypto: 'crypto-browserify',
+        stream: 'stream-browserify',
+        vm: 'vm-browserify'
+      },
+      alias: {
+        bson: path.resolve(__dirname, 'node_modules/bson/lib/bson.cjs')
       }
     },
 
