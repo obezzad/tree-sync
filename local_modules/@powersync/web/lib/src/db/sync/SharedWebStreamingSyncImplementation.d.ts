@@ -16,7 +16,7 @@ declare class SharedSyncClientProvider extends AbstractSharedSyncClientProvider 
     getDBWorkerPort(): Promise<MessagePort>;
     fetchCredentials(): Promise<PowerSyncCredentials | null>;
     uploadCrud(): Promise<void>;
-    get logger(): any;
+    get logger(): import("js-logger").ILogger | undefined;
     trace(...x: any[]): void;
     debug(...x: any[]): void;
     info(...x: any[]): void;

@@ -14,5 +14,5 @@ export declare abstract class AbstractWebSQLOpenFactory implements SQLOpenFactor
      * Opens a {@link DBAdapter} using resolved flags.
      * A SSR implementation is loaded if SSR mode is detected.
      */
-    openDB(): any;
+    openDB(): DBAdapter;
 }

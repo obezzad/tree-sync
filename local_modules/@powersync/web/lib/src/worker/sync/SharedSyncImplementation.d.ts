@@ -82,7 +82,7 @@ export declare class SharedSyncImplementation extends BaseObserver<SharedSyncImp
      * Configures the DBAdapter connection and a streaming sync client.
      */
     setParams(params: SharedSyncInitOptions): Promise<void>;
-    dispose(): Promise<any>;
+    dispose(): Promise<void | undefined>;
     /**
      * Connects to the PowerSync backend instance.
      * Multiple tabs can safely call this in their initialization.

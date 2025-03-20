@@ -11,10 +11,10 @@ export declare class SSRDBAdapter extends BaseObserver<DBAdapterListener> implem
     writeMutex: Mutex;
     constructor();
     close(): void;
-    readLock<T>(fn: (tx: LockContext) => Promise<T>, options?: DBLockOptions): Promise<any>;
-    readTransaction<T>(fn: (tx: Transaction) => Promise<T>, options?: DBLockOptions): Promise<any>;
-    writeLock<T>(fn: (tx: LockContext) => Promise<T>, options?: DBLockOptions): Promise<any>;
-    writeTransaction<T>(fn: (tx: Transaction) => Promise<T>, options?: DBLockOptions): Promise<any>;
+    readLock<T>(fn: (tx: LockContext) => Promise<T>, options?: DBLockOptions): Promise<T>;
+    readTransaction<T>(fn: (tx: Transaction) => Promise<T>, options?: DBLockOptions): Promise<T>;
+    writeLock<T>(fn: (tx: LockContext) => Promise<T>, options?: DBLockOptions): Promise<T>;
+    writeTransaction<T>(fn: (tx: Transaction) => Promise<T>, options?: DBLockOptions): Promise<T>;
     execute(query: string, params?: any[]): Promise<QueryResult>;
     executeBatch(query: string, params?: any[][]): Promise<QueryResult>;
     getAll<T>(sql: string, parameters?: any[]): Promise<T[]>;

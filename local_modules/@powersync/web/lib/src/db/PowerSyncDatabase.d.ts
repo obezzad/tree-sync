@@ -1,4 +1,5 @@
 import { type BucketStorageAdapter, type PowerSyncBackendConnector, type PowerSyncCloseOptions, type PowerSyncConnectionOptions, type RequiredAdditionalConnectionOptions, AbstractPowerSyncDatabase, DBAdapter, PowerSyncDatabaseOptions, PowerSyncDatabaseOptionsWithDBAdapter, PowerSyncDatabaseOptionsWithOpenFactory, PowerSyncDatabaseOptionsWithSettings, StreamingSyncImplementation } from '@powersync/common';
+import { Mutex } from 'async-mutex';
 import { ResolvedWebSQLOpenOptions, WebSQLFlags } from './adapters/web-sql-flags';
 export interface WebPowerSyncFlags extends WebSQLFlags {
     /**
@@ -53,7 +54,7 @@ export declare const resolveWebPowerSyncFlags: (flags?: WebPowerSyncFlags) => Re
  */
 export declare class PowerSyncDatabase extends AbstractPowerSyncDatabase {
     protected options: WebPowerSyncDatabaseOptions;
-    static SHARED_MUTEX: any;
+    static SHARED_MUTEX: Mutex;
     protected unloadListener?: () => Promise<void>;
     protected resolvedFlags: WebPowerSyncFlags;
     constructor(options: WebPowerSyncDatabaseOptionsWithAdapter);
@@ -70,7 +71,7 @@ export declare class PowerSyncDatabase extends AbstractPowerSyncDatabase {
     close(options?: PowerSyncCloseOptions): Promise<void>;
     connect(connector: PowerSyncBackendConnector, options?: PowerSyncConnectionOptions): Promise<void>;
     protected generateBucketStorageAdapter(): BucketStorageAdapter;
-    protected runExclusive<T>(cb: () => Promise<T>): any;
+    protected runExclusive<T>(cb: () => Promise<T>): Promise<any>;
     protected generateSyncStreamImplementation(connector: PowerSyncBackendConnector, options: RequiredAdditionalConnectionOptions): StreamingSyncImplementation;
 }
 export {};

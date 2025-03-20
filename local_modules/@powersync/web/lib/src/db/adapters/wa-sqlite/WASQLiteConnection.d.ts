@@ -95,9 +95,9 @@ export declare class WASqliteConnection extends BaseObserver<WASQLiteConnectionL
      */
     protected connectionId: number;
     constructor(options: ResolvedWASQLiteOpenFactoryOptions);
-    protected get sqliteAPI(): any;
+    protected get sqliteAPI(): SQLiteAPI;
     protected get dbP(): number;
-    protected openDB(): Promise<number | null>;
+    protected openDB(): Promise<number>;
     protected executeEncryptionPragma(): Promise<void>;
     protected openSQLiteAPI(): Promise<SQLiteAPI>;
     protected registerBroadcastListeners(): void;
@@ -114,7 +114,7 @@ export declare class WASqliteConnection extends BaseObserver<WASQLiteConnectionL
      */
     execute(sql: string | TemplateStringsArray, bindings?: any[]): Promise<ProxiedQueryResult>;
     close(): Promise<void>;
-    registerOnTableChange(callback: OnTableChangeCallback): Promise<any>;
+    registerOnTableChange(callback: OnTableChangeCallback): Promise<() => void>;
     /**
      * This requests a lock for executing statements.
      * Should only be used internally.
