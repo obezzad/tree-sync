@@ -58,12 +58,13 @@ export class RootStore {
       () => {
         if (!this.selectedNodeId) return;
 
-        if (this._syncedNodes.length > 0 && !this._syncedNodes.includes(uuidv5("ROOT_NODE", userService.getUserId()))) {
-          this._syncedNodes = [this.selectedNodeId];
-          return;
-        }
+        const rootNodeId = uuidv5("ROOT_NODE", userService.getUserId());
 
-        this._syncedNodes = [...new Set([this.selectedNodeId, ...this._syncedNodes])];
+        if (!this.db?.currentStatus.hasSynced) {
+          this._syncedNodes = [...new Set([rootNodeId, this.selectedNodeId, ...this._syncedNodes])];
+        } else {
+          this._syncedNodes = [rootNodeId];
+        }
       }
     );
 
@@ -81,11 +82,13 @@ export class RootStore {
     reaction(
       () => [this._syncedNodes],
       () => {
-        console.log(
-          "%cReconnect DB with updated nodes",
-          "color: lime"
-        )
-        this.connectDb();
+        if (!this.db?.currentStatus.hasSynced) {
+          console.log(
+            "%cReconnect DB with updated nodes",
+            "color: lime"
+          )
+          this.connectDb();
+        }
       }
     )
   }
@@ -260,14 +263,15 @@ export class RootStore {
       return;
     }
 
-    const selected_nodes = [...this._syncedNodes];
+    const params: Record<string, any> = {
+      user: userService.getUserId()
+    };
 
-    this.db?.connect(backendConnector, {
-      params: {
-        user: userService.getUserId(),
-        selected_nodes
-      }
-    });
+    if (!this.db?.currentStatus.hasSynced) {
+      params.selected_nodes = [...this._syncedNodes];
+    }
+
+    this.db?.connect(backendConnector, { params });
 
     this.db?.waitForFirstSync().then(() => {
       measureOnce(METRICS.TIME_TO_PARTIAL_REPLICATION);
