@@ -18,8 +18,9 @@ export default () => {
       path: path.join(__dirname, 'dist'),
       library: {
         name: 'sdk_web',
-        type: 'umd'
-      }
+        type: 'umd2'
+      },
+      enabledLibraryTypes: ['umd2'],
     },
     module: {
       rules: [
@@ -56,6 +57,8 @@ export default () => {
     devtool: production ? 'source-map' : 'cheap-module-source-map',
     mode: production ? 'production' : 'development',
     optimization: {
+      runtimeChunk: false,
+      splitChunks: false,
       minimizer: [new TerserPlugin()]
     },
     plugins: [

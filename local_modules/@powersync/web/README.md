@@ -79,7 +79,7 @@ For some frameworks, it may be required to configure the web workers ([see the d
 The `@powersync/web` package includes a CLI utility which can copy the required assets to the `public` directory (configurable with the `--output` option).
 
 ```bash
-pnpm powersync-web copy-assets
+npm exec powersync-web copy-assets
 ```
 
 # Changelog

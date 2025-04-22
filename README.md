@@ -15,7 +15,7 @@ A PoC for local-first replicated tree synchronization using PowerSync and Supaba
 
 1. Install dependencies:
 ```bash
-pnpm install
+npm install
 ```
 
 2. Set up environment variables:
@@ -27,7 +27,7 @@ cp .env.example .env.local
 
 4. Run the development server:
 ```bash
-pnpm watch
+npm run watch
 ```
 
 ## Architecture
@@ -43,10 +43,10 @@ pnpm watch
 
 ## Development
 
-- `pnpm watch`: Start development server
-- `pnpm build`: Production build
-- `pnpm start`: Run production server
-- `pnpm lint`: Run linting
+- `npm run watch`: Start development server
+- `npm run build`: Production build
+- `npm run start`: Run production server
+- `npm run lint`: Run linting
 
 ## Project Structure
 

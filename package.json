@@ -3,19 +3,19 @@
   "version": "0.1.15",
   "private": true,
   "scripts": {
-    "build": "pnpm run build:all",
-    "build:all": "pnpm run build:powersync-common && pnpm run build:powersync-web && pnpm run build:next",
+    "build": "npm run build:all",
+    "build:all": "npm run build:powersync-common && npm run build:powersync-web && npm run build:next",
     "build:next": "next build",
-    "build:powersync-common": "cd local_modules/@powersync/common && pnpm install && pnpm run build",
-    "build:powersync-web": "cd local_modules/@powersync/web && pnpm install && pnpm run build",
+    "build:powersync-common": "cd local_modules/@powersync/common && npm_config_production=false npm ci && npm run build",
+    "build:powersync-web": "cd local_modules/@powersync/web && npm_config_production=false npm ci && npm run build",
     "clean": "rm -rf .next",
     "watch": "next dev",
-    "watch:powersync-common": "cd local_modules/@powersync/common && pnpm install && pnpm run watch",
-    "watch:powersync-web": "cd local_modules/@powersync/web && pnpm install && pnpm run watch",
-    "watch:all": "concurrently \"pnpm run watch:powersync-common\" \"pnpm run watch:powersync-web\" \"pnpm run watch\"",
+    "watch:powersync-common": "cd local_modules/@powersync/common && npm install && npm run watch",
+    "watch:powersync-web": "cd local_modules/@powersync/web && npm install && npm run watch",
+    "watch:all": "concurrently \"npm run watch:powersync-common\" \"npm run watch:powersync-web\" \"npm run watch\"",
     "start": "next start",
     "lint": "next lint",
-    "test:build": "pnpm build"
+    "test:build": "npm build"
   },
   "dependencies": {
     "@emotion/react": "^11.13.5",

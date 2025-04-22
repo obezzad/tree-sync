@@ -6,5 +6,6 @@
       "use": "@vercel/next"
     }
   ],
+  "installCommand": "npm ci",
   "buildCommand": "npm run build"
 }
