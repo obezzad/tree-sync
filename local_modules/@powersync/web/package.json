@@ -70,9 +70,7 @@
     "bson": "^6.10.3",
     "comlink": "^4.4.2",
     "commander": "^12.1.0",
-    "js-logger": "^1.6.1"
-  },
-  "devDependencies": {
+    "js-logger": "^1.6.1",
     "@journeyapps/wa-sqlite": "^1.2.2",
     "@types/uuid": "^9.0.6",
     "crypto-browserify": "^3.12.0",
