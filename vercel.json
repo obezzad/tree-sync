@@ -6,5 +6,5 @@
       "use": "@vercel/next"
     }
   ],
-  "buildCommand": "pnpm run build"
+  "buildCommand": "npm run build"
 }
