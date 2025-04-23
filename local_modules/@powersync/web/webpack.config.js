@@ -8,7 +8,6 @@ import webpack from 'webpack';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const { LimitChunkCountPlugin } = webpack.optimize;
 
 export default () => {
   return {
@@ -19,8 +18,7 @@ export default () => {
       library: {
         name: 'sdk_web',
         type: 'umd2'
-      },
-      enabledLibraryTypes: ['umd2'],
+      }
     },
     module: {
       rules: [
@@ -62,9 +60,6 @@ export default () => {
       minimizer: [new TerserPlugin()]
     },
     plugins: [
-      new LimitChunkCountPlugin({
-        maxChunks: 1 // There are issues with loading the dynamic BSON import, it works if the bson dependency is in the index bundle file
-      }),
       new DeleteAssetsPlugin() // Add the custom plugin here
     ]
   };
