@@ -50,6 +50,7 @@ export class NodeService {
   }
 
   async moveNode(nodeId: string, newParentId: string | null) {
+    console.log('[NodeService] moveNode →', { nodeId, newParentId });
     await this.activeMutationStore.mutate({
       name: 'move_node',
       args: {
@@ -57,6 +58,17 @@ export class NodeService {
         new_parent_id: newParentId
       },
       optimisticUpdate: async (tx: Transaction) => {
+        // Hack: simple parent update without recursion to test performance
+        console.log('[NodeService] optimisticUpdate HACK simple UPDATE');
+        const updateResult = await tx.execute(
+          `UPDATE nodes SET parent_id = ? WHERE id = ? RETURNING id`,
+          [newParentId, nodeId]
+        );
+        return updateResult.rows?._array.map(row => row.id) ?? [];
+        // Original recursive CTE logic commented out for testing
+        /*
+        console.log('[NodeService] optimisticUpdate move_node START');
+        console.time('move_node SQL');
         const updateResult = await tx.execute(`
           WITH RECURSIVE ancestors AS (
             -- Base: start with the proposed new parent
@@ -79,10 +91,14 @@ export class NodeService {
             OR ? NOT IN (SELECT id FROM ancestors)  -- Check ancestors if not moving to root
         )
           RETURNING id;`, [newParentId, newParentId, newParentId, nodeId, newParentId, nodeId]);
+        console.timeEnd('move_node SQL');
+        console.log('[NodeService] optimisticUpdate move_node END');
 
         return updateResult.rows?._array.map(row => row.id) ?? [];
+        */
       }
     });
+    console.log('[NodeService] moveNode DONE');
 
     runInAction(() => {
       store.selectedNodeId = newParentId;

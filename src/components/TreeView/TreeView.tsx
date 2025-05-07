@@ -139,6 +139,7 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
   }, []);
 
   const handleMove = useCallback(async (sourceId: string, targetId: string, position: 'before' | 'after' | 'inside') => {
+    console.log('👉 handleMove(', sourceId, ',', targetId, ',', position, ')');
     if (readOnly) return;
 
     const sourceNode = findNode(sourceId, treeData);
@@ -156,11 +157,13 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
     }
 
     try {
+      console.log('   calling nodeService.moveNode…');
       if (position !== 'inside') {
         throw new Error('Siblings reordering is not supported yet');
       }
 
       await nodeService.moveNode(sourceId, targetId);
+      console.log('   moveNode resolved');
 
       if (targetId === null && !collapsedRootIdsRef.current.has(sourceId)) {
         setCollapsedNodes(prev => {

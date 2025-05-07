@@ -744,8 +744,10 @@ export abstract class AbstractPowerSyncDatabase extends BaseObserver<PowerSyncDB
     callback: (tx: Transaction) => Promise<T>,
     lockTimeout: number = DEFAULT_LOCK_TIMEOUT_MS
   ): Promise<T> {
+    // Use configured logger rather than console to ensure visibility
+    this.options.logger?.debug(`writeTransaction ENTER (timeout=${lockTimeout})`);
     await this.waitForReady();
-    return this.database.writeTransaction(
+    const result = await this.database.writeTransaction(
       async (tx) => {
         const res = await callback(tx);
         await tx.commit();
@@ -753,6 +755,8 @@ export abstract class AbstractPowerSyncDatabase extends BaseObserver<PowerSyncDB
       },
       { timeoutMs: lockTimeout }
     );
+    this.options.logger?.debug(`writeTransaction EXIT (timeout=${lockTimeout})`);
+    return result;
   }
 
   /**

@@ -140,6 +140,12 @@ export class RootStore {
         disableSSRWarning: true,
       }
     });
+
+    if (typeof window !== 'undefined' && this.db) {
+      // Expose the PowerSyncDatabase for console debugging
+      (window as any).__psDB = this.db;
+      console.log('[RootStore] db exposed on window.__psDB');
+    }
   }
 
   private persistState() {

@@ -42,12 +42,14 @@ export const TreeNode = observer(({
   const isRoot = level === 0;
 
   const handleDragStart = (e: React.DragEvent) => {
+    console.log('🔹 dragStart on', node.id);
     if (readOnly) return;
     e.dataTransfer.setData('text/plain', node.id);
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleDragOver = (e: React.DragEvent) => {
+    console.log('🔹 dragOver on', node.id);
     if (readOnly) return;
     e.preventDefault();
     e.stopPropagation();
@@ -75,6 +77,7 @@ export const TreeNode = observer(({
     } else {
       setDragOverPosition('inside');
     }
+    console.log('    dropPosition=', dragOverPosition);
   };
 
   const handleDragLeave = () => {
@@ -82,6 +85,7 @@ export const TreeNode = observer(({
   };
 
   const handleDrop = (e: React.DragEvent) => {
+    console.log('🔹 drop on', node.id, 'with position=', dragOverPosition);
     if (readOnly) return;
     e.preventDefault();
     e.stopPropagation();
