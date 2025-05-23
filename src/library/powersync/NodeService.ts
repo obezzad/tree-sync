@@ -49,6 +49,57 @@ export class NodeService {
     });
   }
 
+  async createNodesBatch(nodesData: Array<Partial<Node>>): Promise<string[]> {
+    const user_id = userService.getUserId();
+    const newNodesWithIds = nodesData.map(node => ({
+      ...node,
+      id: uuidv4(),
+      user_id: user_id
+    }));
+
+    const affectedIds = await this.activeMutationStore.mutate({
+      name: 'create_nodes_batch',
+      args: { 
+        operation_type: 'batch_create',
+        count: newNodesWithIds.length,
+      },
+      optimisticUpdate: async (tx: Transaction) => {
+        const insertedIds: string[] = [];
+        for (const node of newNodesWithIds) {
+          const payloadString = typeof node.payload === 'string' 
+                                ? node.payload 
+                                : (node.payload ? JSON.stringify(node.payload) : '{}');
+
+          await tx.execute(
+            `INSERT INTO nodes (id, created_at, payload, user_id, parent_id, _is_pending)
+             VALUES (?, current_timestamp, ?, ?, ?, 1)`,
+            [node.id, payloadString, node.user_id, node.parent_id]
+          );
+          insertedIds.push(node.id!);
+        }
+        return insertedIds;
+      }
+    });
+
+    // Example: If all nodes in the batch share the same parent and we want to select it.
+    // This specific UI interaction might be better handled by the caller or via reactive queries.
+    // For now, I'll comment it out as it's not a strict requirement for the batch creation logic itself.
+    /*
+    if (newNodesWithIds.length > 0) {
+      const firstParentId = newNodesWithIds[0].parent_id;
+      // Check if all nodes have the same parent_id if this behavior is desired
+      const allSameParent = newNodesWithIds.every(n => n.parent_id === firstParentId);
+      if (allSameParent && firstParentId) {
+        runInAction(() => {
+          store.selectedNodeId = firstParentId;
+        });
+      }
+    }
+    */
+
+    return affectedIds ?? []; // ensure it returns an array even if affectedIds is null/undefined
+  }
+
   async moveNode(nodeId: string, newParentId: string | null) {
     await this.activeMutationStore.mutate({
       name: 'move_node',

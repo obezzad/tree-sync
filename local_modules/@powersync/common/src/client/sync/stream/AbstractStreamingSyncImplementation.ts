@@ -260,66 +260,88 @@ export abstract class AbstractStreamingSyncImplementation
   }
 
   protected async _uploadAllCrud(): Promise<void> {
-    return this.obtainLock({
-      type: LockType.CRUD,
-      callback: async () => {
-        /**
-         * Keep track of the first item in the CRUD queue for the last `uploadCrud` iteration.
-         */
-        let checkedCrudItem: CrudEntry | undefined;
+    const methodName = '_uploadAllCrud';
+    const startTime = Date.now();
+    this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation] Starting ${methodName}.`);
 
-        while (true) {
-          this.updateSyncStatus({
-            dataFlow: {
-              uploading: true
-            }
-          });
-          try {
-            /**
-             * This is the first item in the FIFO CRUD queue.
-             */
-            const nextCrudItem = await this.options.adapter.nextCrudItem();
-            if (nextCrudItem) {
-              if (nextCrudItem.clientId == checkedCrudItem?.clientId) {
-                // This will force a higher log level than exceptions which are caught here.
-                this.logger.warn(`Potentially previously uploaded CRUD entries are still present in the upload queue.
-Make sure to handle uploads and complete CRUD transactions or batches by calling and awaiting their [.complete()] method.
-The next upload iteration will be delayed.`);
-                throw new Error('Delaying due to previously encountered CRUD item.');
-              }
+    try {
+      await this.obtainLock({
+        type: LockType.CRUD,
+        callback: async () => {
+          this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Lock acquired. Entering CRUD upload loop.`);
+          /**
+           * Keep track of the first item in the CRUD queue for the last `uploadCrud` iteration.
+           */
+          let checkedCrudItem: CrudEntry | undefined;
 
-              checkedCrudItem = nextCrudItem;
-              await this.options.uploadCrud();
-            } else {
-              // Uploading is completed
-              await this.options.adapter.updateLocalTarget(() => this.getWriteCheckpoint());
-              break;
-            }
-          } catch (ex) {
-            checkedCrudItem = undefined;
-            this.updateSyncStatus({
-              dataFlow: {
-                uploading: false
-              }
-            });
-            await this.delayRetry();
+          while (true) {
             if (!this.isConnected) {
-              // Exit the upload loop if the sync stream is no longer connected
+              this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Not connected, exiting CRUD upload loop.`);
               break;
             }
-            this.logger.debug(
-              `Caught exception when uploading. Upload will retry after a delay. Exception: ${ex.message}`
-            );
-          } finally {
+
             this.updateSyncStatus({
               dataFlow: {
-                uploading: false
+                uploading: true
               }
             });
+            try {
+              /**
+               * This is the first item in the FIFO CRUD queue.
+               */
+              const nextCrudItem = await this.options.adapter.nextCrudItem();
+              if (nextCrudItem) {
+                if (nextCrudItem.clientId == checkedCrudItem?.clientId) {
+                  this.logger.warn(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Potentially previously uploaded CRUD entries (ID: ${checkedCrudItem.clientId}) are still present in the upload queue. Make sure to handle uploads and complete CRUD transactions or batches by calling and awaiting their [.complete()] method. The next upload iteration will be delayed.`);
+                  throw new Error('Delaying due to previously encountered CRUD item.');
+                }
+
+                checkedCrudItem = nextCrudItem;
+                this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Calling options.uploadCrud for item ${nextCrudItem?.clientId}.`);
+                const uploadStartTime = Date.now();
+                await this.options.uploadCrud();
+                const uploadDuration = Date.now() - uploadStartTime;
+                this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Finished options.uploadCrud. Duration: ${uploadDuration}ms.`);
+              } else {
+                // Uploading is completed
+                this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] No more CRUD items to upload. Attempting to update local target.`);
+                await this.options.adapter.updateLocalTarget(() => this.getWriteCheckpoint());
+                this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Exited CRUD upload loop (no more items).`);
+                break;
+              }
+            } catch (ex) {
+              this.logger.error(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Error in CRUD upload loop: ${ex.message}`, ex);
+              checkedCrudItem = undefined; // Reset on error
+              this.updateSyncStatus({
+                dataFlow: {
+                  uploading: false
+                }
+              });
+              if (!this.isConnected) {
+                this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Not connected, exiting CRUD upload loop after error.`);
+                break;
+              }
+              await this.delayRetry();
+              this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Caught exception when uploading. Upload will retry after a delay. Exception: ${ex.message}`);
+            } finally {
+              this.updateSyncStatus({
+                dataFlow: {
+                  uploading: false
+                }
+              });
+            }
           }
+          this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] CRUD upload loop finished.`);
         }
-      }
-    });
+      });
+      const duration = Date.now() - startTime;
+      this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation] Finished ${methodName}. Duration: ${duration}ms.`);
+    } catch (error) {
+      // This catch is for errors from obtainLock itself, or if the callback rejects unexpectedly
+      const duration = Date.now() - startTime;
+      this.logger.error(`[PowerSyncSDK][AbstractStreamingSyncImplementation] Error in ${methodName}. Duration: ${duration}ms. Error:`, error);
+      // Do not re-throw here as _uploadAllCrud is often called in a fire-and-forget manner by throttle.
+    }
   }
 
   async connect(options?: PowerSyncConnectionOptions) {
@@ -490,18 +512,23 @@ The next upload iteration will be delayed.`);
     signal: AbortSignal,
     options?: PowerSyncConnectionOptions
   ): Promise<{ retry?: boolean }> {
-    return await this.obtainLock({
-      type: LockType.SYNC,
-      signal,
-      callback: async () => {
-        const resolvedOptions: RequiredPowerSyncConnectionOptions = {
-          ...DEFAULT_STREAM_CONNECTION_OPTIONS,
-          ...(options ?? {})
-        };
+    const methodName = 'streamingSyncIteration';
+    const iterationStartTime = Date.now();
+    this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation] Starting new ${methodName}.`);
 
-        this.logger.debug('Streaming sync iteration started');
-        this.options.adapter.startSession();
-        let [req, bucketMap] = await this.collectLocalBucketState();
+    try {
+      const result = await this.obtainLock({
+        type: LockType.SYNC,
+        signal,
+        callback: async () => {
+          const resolvedOptions: RequiredPowerSyncConnectionOptions = {
+            ...DEFAULT_STREAM_CONNECTION_OPTIONS,
+            ...(options ?? {})
+          };
+
+          this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Lock acquired. Iteration started.`);
+          this.options.adapter.startSession();
+          let [req, bucketMap] = await this.collectLocalBucketState();
 
         // These are compared by reference
         let targetCheckpoint: Checkpoint | null = null;
@@ -570,20 +597,22 @@ The next upload iteration will be delayed.`);
             await this.options.adapter.removeBuckets([...bucketsToDelete]);
             await this.options.adapter.setTargetCheckpoint(targetCheckpoint);
           } else if (isStreamingSyncCheckpointComplete(line)) {
-            this.logger.debug('Checkpoint complete', targetCheckpoint);
+            this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Received StreamingSyncCheckpointComplete. Checkpoint: ${targetCheckpoint ? JSON.stringify(targetCheckpoint) : 'null'}.`);
+            const syncDbStartTime = Date.now();
+            this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Calling adapter.syncLocalDatabase.`);
             const result = await this.options.adapter.syncLocalDatabase(targetCheckpoint!);
+            const syncDbDuration = Date.now() - syncDbStartTime;
+            this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Finished adapter.syncLocalDatabase. Duration: ${syncDbDuration}ms. Result valid: ${result.checkpointValid}, ready: ${result.ready}`);
+
             if (!result.checkpointValid) {
-              // This means checksums failed. Start again with a new checkpoint.
-              // TODO: better back-off
+              this.logger.warn(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Checkpoint validation failed. Retrying after delay.`);
               await new Promise((resolve) => setTimeout(resolve, 50));
               return { retry: true };
             } else if (!result.ready) {
-              // Checksums valid, but need more data for a consistent checkpoint.
-              // Continue waiting.
-              // landing here the whole time
+              this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Checkpoint valid but not ready for full sync. Continuing to wait for more data.`);
             } else {
               appliedCheckpoint = targetCheckpoint;
-              this.logger.debug('validated checkpoint', appliedCheckpoint);
+              this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Checkpoint validated and applied. LastSyncedAt will be updated.`);
               this.updateSyncStatus({
                 connected: true,
                 lastSyncedAt: new Date(),
@@ -597,17 +626,20 @@ The next upload iteration will be delayed.`);
           } else if (isStreamingSyncCheckpointPartiallyComplete(line)) {
             const priority = line.partial_checkpoint_complete.priority;
             this.logger.debug('Partial checkpoint complete', priority);
+            const syncDbStartTime = Date.now();
+            this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Calling adapter.syncLocalDatabase for partial checkpoint. Priority: ${priority}`);
             const result = await this.options.adapter.syncLocalDatabase(targetCheckpoint!, priority);
+            const syncDbDuration = Date.now() - syncDbStartTime;
+            this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Finished adapter.syncLocalDatabase for partial checkpoint. Duration: ${syncDbDuration}ms. Result valid: ${result.checkpointValid}, ready: ${result.ready}`);
+
             if (!result.checkpointValid) {
-              // This means checksums failed. Start again with a new checkpoint.
-              // TODO: better back-off
+              this.logger.warn(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Partial checkpoint validation failed for priority ${priority}. Retrying after delay.`);
               await new Promise((resolve) => setTimeout(resolve, 50));
               return { retry: true };
             } else if (!result.ready) {
-              // Need more data for a consistent partial sync within a priority - continue waiting.
+              this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Partial checkpoint for priority ${priority} valid but not ready. Continuing to wait.`);
             } else {
-              // We'll keep on downloading, but can report that this priority is synced now.
-              this.logger.debug('partial checkpoint validation succeeded');
+              this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Partial checkpoint validation succeeded for priority ${priority}.`);
 
               // All states with a higher priority can be deleted since this partial sync includes them.
               const priorityStates = this.syncStatus.priorityStatusEntries.filter((s) => s.priority <= priority);
@@ -625,9 +657,11 @@ The next upload iteration will be delayed.`);
           } else if (isStreamingSyncCheckpointDiff(line)) {
             // TODO: It may be faster to just keep track of the diff, instead of the entire checkpoint
             if (targetCheckpoint == null) {
+              this.logger.error(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Received StreamingSyncCheckpointDiff but targetCheckpoint is null. This indicates a potential protocol issue.`);
               throw new Error('Checkpoint diff without previous checkpoint');
             }
             const diff = line.checkpoint_diff;
+            this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Received StreamingSyncCheckpointDiff. Diff: ${JSON.stringify(diff)}.`);
             const newBuckets = new Map<string, BucketChecksum>();
             for (const checksum of targetCheckpoint.buckets) {
               newBuckets.set(checksum.bucket, checksum);
@@ -661,15 +695,21 @@ The next upload iteration will be delayed.`);
             await this.options.adapter.removeBuckets(bucketsToDelete);
             await this.options.adapter.setTargetCheckpoint(targetCheckpoint);
           } else if (isStreamingSyncData(line)) {
-            const { data } = line;
+            const { data } = line; // data is a SyncDataBucketJSON
+            this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Received StreamingSyncData. Bucket: ${data.bucket}, Ops count: ${data.data.length}.`);
             this.updateSyncStatus({
               dataFlow: {
                 downloading: true
               }
             });
+            this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Calling adapter.saveSyncData.`);
+            const saveSyncDataStartTime = Date.now();
             await this.options.adapter.saveSyncData({ buckets: [SyncDataBucket.fromRow(data)] });
+            const saveSyncDataDuration = Date.now() - saveSyncDataStartTime;
+            this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Finished adapter.saveSyncData. Duration: ${saveSyncDataDuration}ms.`);
           } else if (isStreamingKeepalive(line)) {
             const remaining_seconds = line.token_expires_in;
+            this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Received StreamingKeepalive. Token expires in: ${remaining_seconds}s.`);
             if (remaining_seconds == 0) {
               // Connection would be closed automatically right after this
               this.logger.debug('Token expiring; reconnect');
@@ -714,11 +754,21 @@ The next upload iteration will be delayed.`);
             }
           }
         }
-        this.logger.debug('Stream input empty');
+        this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation][${methodName}] Stream input empty.`);
         // Connection closed. Likely due to auth issue.
         return { retry: true };
-      }
-    });
+      } // End of callback
+    }); // End of obtainLock
+
+      const iterationDuration = Date.now() - iterationStartTime;
+      this.logger.debug(`[PowerSyncSDK][AbstractStreamingSyncImplementation] ${methodName} finished or stream closed. Duration: ${iterationDuration}ms. Result: ${JSON.stringify(result)}`);
+      return result;
+    } catch (error) {
+      // This catch is for errors from obtainLock itself or unhandled errors within the callback
+      const iterationDuration = Date.now() - iterationStartTime;
+      this.logger.error(`[PowerSyncSDK][AbstractStreamingSyncImplementation] Error in ${methodName}. Duration: ${iterationDuration}ms. Error:`, error);
+      throw error; // Re-throw to be handled by the calling loop in streamingSync
+    }
   }
 
   protected updateSyncStatus(options: SyncStatusOptions) {

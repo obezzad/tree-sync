@@ -725,14 +725,27 @@ export abstract class AbstractPowerSyncDatabase extends BaseObserver<PowerSyncDB
     lockTimeout: number = DEFAULT_LOCK_TIMEOUT_MS
   ): Promise<T> {
     await this.waitForReady();
-    return this.database.readTransaction(
-      async (tx) => {
-        const res = await callback({ ...tx });
-        await tx.rollback();
-        return res;
-      },
-      { timeoutMs: lockTimeout }
-    );
+    const startTime = Date.now();
+    this.options.logger?.debug('[PowerSyncSDK][AbstractPowerSyncDatabase] Attempting to acquire read transaction lock.');
+    try {
+      const result = await this.database.readTransaction(
+        async (tx) => {
+          this.options.logger?.debug('[PowerSyncSDK][AbstractPowerSyncDatabase] Read transaction lock acquired. Executing callback.');
+          const res = await callback({ ...tx });
+          // Rollback is called to ensure no changes are accidentally committed if the underlying DBAdapter doesn't enforce it.
+          await tx.rollback();
+          return res;
+        },
+        { timeoutMs: lockTimeout }
+      );
+      const duration = Date.now() - startTime;
+      this.options.logger?.debug(`[PowerSyncSDK][AbstractPowerSyncDatabase] Read transaction finished. Duration: ${duration}ms.`);
+      return result;
+    } catch (e) {
+      const duration = Date.now() - startTime;
+      this.options.logger?.error(`[PowerSyncSDK][AbstractPowerSyncDatabase] Read transaction failed. Duration: ${duration}ms. Error:`, e);
+      throw e;
+    }
   }
 
   /**
@@ -745,14 +758,27 @@ export abstract class AbstractPowerSyncDatabase extends BaseObserver<PowerSyncDB
     lockTimeout: number = DEFAULT_LOCK_TIMEOUT_MS
   ): Promise<T> {
     await this.waitForReady();
-    return this.database.writeTransaction(
-      async (tx) => {
-        const res = await callback(tx);
-        await tx.commit();
-        return res;
-      },
-      { timeoutMs: lockTimeout }
-    );
+    const startTime = Date.now();
+    this.options.logger?.debug('[PowerSyncSDK][AbstractPowerSyncDatabase] Attempting to acquire write transaction lock.');
+    try {
+      const result = await this.database.writeTransaction(
+        async (tx) => {
+          this.options.logger?.debug('[PowerSyncSDK][AbstractPowerSyncDatabase] Write transaction lock acquired. Executing callback.');
+          const res = await callback(tx);
+          this.options.logger?.debug('[PowerSyncSDK][AbstractPowerSyncDatabase] Write transaction callback complete. Committing.');
+          await tx.commit();
+          return res;
+        },
+        { timeoutMs: lockTimeout }
+      );
+      const duration = Date.now() - startTime;
+      this.options.logger?.debug(`[PowerSyncSDK][AbstractPowerSyncDatabase] Write transaction finished. Duration: ${duration}ms.`);
+      return result;
+    } catch (e) {
+      const duration = Date.now() - startTime;
+      this.options.logger?.error(`[PowerSyncSDK][AbstractPowerSyncDatabase] Write transaction failed. Duration: ${duration}ms. Error:`, e);
+      throw e;
+    }
   }
 
   /**

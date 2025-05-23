@@ -85,43 +85,76 @@ export class SqliteBucketStorage extends BaseObserver<BucketStorageListener> imp
   startSession(): void {}
 
   async getBucketStates(): Promise<BucketState[]> {
+    const methodName = 'getBucketStates';
+    const startTime = Date.now();
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Entering ${methodName}.`);
     const result = await this.db.getAll<BucketState>(
       "SELECT name as bucket, cast(last_op as TEXT) as op_id FROM ps_buckets WHERE pending_delete = 0 AND name != '$local'"
     );
+    const duration = Date.now() - startTime;
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Exiting ${methodName}. Duration: ${duration}ms.`);
     return result;
   }
 
   async saveSyncData(batch: SyncDataBatch) {
+    const methodName = 'saveSyncData';
+    const startTime = Date.now();
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Entering ${methodName}. Buckets count: ${batch.buckets.length}`);
+
     await this.writeTransaction(async (tx) => {
+      const txStartTime = Date.now();
+      this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${methodName}] Starting to save sync data operations to powersync_operations.`);
       let count = 0;
       for (const b of batch.buckets) {
-        const result = await tx.execute('INSERT INTO powersync_operations(op, data) VALUES(?, ?)', [
+        // Not logging individual bucket details here to avoid excessive log volume.
+        // The 'save' operation itself implies what's happening.
+        await tx.execute('INSERT INTO powersync_operations(op, data) VALUES(?, ?)', [
           'save',
           JSON.stringify({ buckets: [b.toJSON()] })
         ]);
-        this.logger.debug('saveSyncData', JSON.stringify(result));
         count += b.data.length;
       }
       this.compactCounter += count;
+      const txDuration = Date.now() - txStartTime;
+      this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${methodName}] Finished saving sync data operations. Operations count: ${count}. Transaction duration: ${txDuration}ms.`);
     });
+
+    const duration = Date.now() - startTime;
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Exiting ${methodName}. Duration: ${duration}ms.`);
   }
 
   async removeBuckets(buckets: string[]): Promise<void> {
+    const methodName = 'removeBuckets';
+    const startTime = Date.now();
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Entering ${methodName}. Bucket IDs: ${JSON.stringify(buckets)}`);
+
+    // deleteBucket is called in a loop, and it has its own transaction and logging.
     for (const bucket of buckets) {
       await this.deleteBucket(bucket);
     }
+
+    const duration = Date.now() - startTime;
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Exiting ${methodName}. Duration: ${duration}ms.`);
   }
 
   /**
    * Mark a bucket for deletion.
    */
   private async deleteBucket(bucket: string) {
+    const methodName = 'deleteBucket';
+    const startTime = Date.now();
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Entering ${methodName}. Bucket ID: ${bucket}`);
+
     await this.writeTransaction(async (tx) => {
+      const txStartTime = Date.now();
       await tx.execute('INSERT INTO powersync_operations(op, data) VALUES(?, ?)', ['delete_bucket', bucket]);
+      const txDuration = Date.now() - txStartTime;
+      this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${methodName}] Marked bucket for deletion. Transaction duration: ${txDuration}ms.`);
     });
 
-    this.logger.debug('done deleting bucket');
-    this.pendingBucketDeletes = true;
+    this.pendingBucketDeletes = true; // Keep this logic
+    const duration = Date.now() - startTime;
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Exiting ${methodName}. Duration: ${duration}ms.`);
   }
 
   async hasCompletedSync() {
@@ -137,9 +170,13 @@ export class SqliteBucketStorage extends BaseObserver<BucketStorageListener> imp
   }
 
   async syncLocalDatabase(checkpoint: Checkpoint, priority?: number): Promise<SyncLocalDatabaseResult> {
+    const methodName = 'syncLocalDatabase';
+    const startTime = Date.now();
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Entering ${methodName}. Checkpoint last_op_id: ${checkpoint.last_op_id}, Buckets count: ${checkpoint.buckets.length}, Priority: ${priority}`);
+
     const r = await this.validateChecksums(checkpoint, priority);
     if (!r.checkpointValid) {
-      this.logger.error('Checksums failed for', r.checkpointFailures);
+      this.logger.error(`[PowerSyncSDK][SqliteBucketStorage][${methodName}] Checksums failed for buckets: ${JSON.stringify(r.checkpointFailures)}`);
       for (const b of r.checkpointFailures ?? []) {
         await this.deleteBucket(b);
       }
@@ -151,7 +188,9 @@ export class SqliteBucketStorage extends BaseObserver<BucketStorageListener> imp
       buckets.filter((b) => hasMatchingPriority(priority, b));
     }
     const bucketNames = buckets.map((b) => b.bucket);
+    const updateBucketsStartTime = Date.now();
     await this.writeTransaction(async (tx) => {
+      const txStartTime = Date.now();
       await tx.execute(`UPDATE ps_buckets SET last_op = ? WHERE name IN (SELECT json_each.value FROM json_each(?))`, [
         checkpoint.last_op_id,
         JSON.stringify(bucketNames)
@@ -160,16 +199,24 @@ export class SqliteBucketStorage extends BaseObserver<BucketStorageListener> imp
       if (priority == null && checkpoint.write_checkpoint) {
         await tx.execute("UPDATE ps_buckets SET last_op = ? WHERE name = '$local'", [checkpoint.write_checkpoint]);
       }
+      const txDuration = Date.now() - txStartTime;
+      this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${methodName}] Updated bucket last_op_ids. Transaction duration: ${txDuration}ms.`);
     });
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${methodName}] Finished updating bucket last_op_ids. Duration: ${Date.now() - updateBucketsStartTime}ms.`);
 
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${methodName}] Calling updateObjectsFromBuckets.`);
     const valid = await this.updateObjectsFromBuckets(checkpoint, priority);
     if (!valid) {
-      this.logger.debug('Not at a consistent checkpoint - cannot update local db');
+      this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${methodName}] updateObjectsFromBuckets returned false. Not at a consistent checkpoint - cannot update local db.`);
+      const duration = Date.now() - startTime;
+      this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Exiting ${methodName} (early due to inconsistent checkpoint). Duration: ${duration}ms.`);
       return { ready: false, checkpointValid: true };
     }
 
-    await this.forceCompact();
+    await this.forceCompact(); // forceCompact has its own logging
 
+    const duration = Date.now() - startTime;
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Exiting ${methodName}. Duration: ${duration}ms.`);
     return {
       ready: true,
       checkpointValid: true
@@ -182,6 +229,11 @@ export class SqliteBucketStorage extends BaseObserver<BucketStorageListener> imp
    * This includes creating new tables, dropping old tables, and copying data over from the oplog.
    */
   private async updateObjectsFromBuckets(checkpoint: Checkpoint, priority: number | undefined) {
+    const methodName = 'updateObjectsFromBuckets';
+    const startTime = Date.now();
+    // Checkpoint details are logged by the caller (syncLocalDatabase)
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Entering ${methodName}. Priority: ${priority}`);
+
     let arg = '';
     if (priority !== undefined) {
       const affectedBuckets: string[] = [];
@@ -193,21 +245,34 @@ export class SqliteBucketStorage extends BaseObserver<BucketStorageListener> imp
 
       arg = JSON.stringify({ priority, buckets: affectedBuckets });
     }
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${methodName}] Executing updateObjectsFromBuckets (sync_local operation). Arg: ${arg}`);
 
-    return this.writeTransaction(async (tx) => {
-      const { insertId: result } = await tx.execute('INSERT INTO powersync_operations(op, data) VALUES(?, ?)', [
+    const result = await this.writeTransaction(async (tx) => {
+      const txStartTime = Date.now();
+      const { insertId: opResult } = await tx.execute('INSERT INTO powersync_operations(op, data) VALUES(?, ?)', [
         'sync_local',
         arg
       ]);
-      return result == 1;
+      const txDuration = Date.now() - txStartTime;
+      this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${methodName}] Executed powersync_operations (sync_local). Result: ${opResult}. Transaction duration: ${txDuration}ms.`);
+      return opResult == 1;
     });
+
+    const duration = Date.now() - startTime;
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Exiting ${methodName}. Result: ${result}. Duration: ${duration}ms.`);
+    return result;
   }
 
   async validateChecksums(checkpoint: Checkpoint, priority: number | undefined): Promise<SyncLocalDatabaseResult> {
+    const methodName = 'validateChecksums';
+    const startTime = Date.now();
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Entering ${methodName}. Checkpoint buckets: ${checkpoint.buckets.length}, Priority: ${priority}`);
+
     if (priority !== undefined) {
       // Only validate the buckets within the priority we care about
       const newBuckets = checkpoint.buckets.filter((cs) => hasMatchingPriority(priority, cs));
       checkpoint = { ...checkpoint, buckets: newBuckets };
+      this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${methodName}] Filtered buckets for priority. New count: ${newBuckets.length}`);
     }
 
     const rs = await this.db.execute('SELECT powersync_validate_checkpoint(?) as result', [
@@ -215,8 +280,10 @@ export class SqliteBucketStorage extends BaseObserver<BucketStorageListener> imp
     ]);
 
     const resultItem = rs.rows?.item(0);
-    this.logger.debug('validateChecksums priority, checkpoint, result item', priority, checkpoint, resultItem);
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${methodName}] powersync_validate_checkpoint result item: ${JSON.stringify(resultItem)}`);
     if (!resultItem) {
+      const duration = Date.now() - startTime;
+      this.logger.warn(`[PowerSyncSDK][SqliteBucketStorage][${methodName}] No result item from powersync_validate_checkpoint. Duration: ${duration}ms.`);
       return {
         checkpointValid: false,
         ready: false,
@@ -225,6 +292,8 @@ export class SqliteBucketStorage extends BaseObserver<BucketStorageListener> imp
     }
 
     const result = JSON.parse(resultItem['result']);
+    const duration = Date.now() - startTime;
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Exiting ${methodName}. Valid: ${result['valid']}. Failed buckets: ${JSON.stringify(result['failed_buckets'])}. Duration: ${duration}ms.`);
 
     if (result['valid']) {
       return { ready: true, checkpointValid: true };
@@ -241,39 +310,79 @@ export class SqliteBucketStorage extends BaseObserver<BucketStorageListener> imp
    * Force a compact, for tests.
    */
   async forceCompact() {
+    const methodName = 'forceCompact';
+    const startTime = Date.now();
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Entering ${methodName}.`);
+
     this.compactCounter = COMPACT_OPERATION_INTERVAL;
     this.pendingBucketDeletes = true;
 
-    await this.autoCompact();
+    await this.autoCompact(); // autoCompact has its own logging
+
+    const duration = Date.now() - startTime;
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Exiting ${methodName}. Duration: ${duration}ms.`);
   }
 
   async autoCompact() {
-    await this.deletePendingBuckets();
-    await this.clearRemoveOps();
+    const methodName = 'autoCompact';
+    const startTime = Date.now();
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Entering ${methodName}.`);
+
+    await this.deletePendingBuckets(); // Has its own logging
+    await this.clearRemoveOps();     // Has its own logging
+
+    const duration = Date.now() - startTime;
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Exiting ${methodName}. Duration: ${duration}ms.`);
   }
 
   private async deletePendingBuckets() {
+    const methodName = 'deletePendingBuckets';
+    const startTime = Date.now();
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Entering ${methodName}. Pending deletes: ${this.pendingBucketDeletes}`);
+
     if (this.pendingBucketDeletes !== false) {
       await this.writeTransaction(async (tx) => {
+        const txStartTime = Date.now();
         await tx.execute('INSERT INTO powersync_operations(op, data) VALUES (?, ?)', ['delete_pending_buckets', '']);
+        const txDuration = Date.now() - txStartTime;
+        this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${methodName}] Executed delete_pending_buckets operation. Transaction duration: ${txDuration}ms.`);
       });
       // Executed once after start-up, and again when there are pending deletes.
       this.pendingBucketDeletes = false;
     }
+
+    const duration = Date.now() - startTime;
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Exiting ${methodName}. Duration: ${duration}ms.`);
   }
 
   private async clearRemoveOps() {
+    const methodName = 'clearRemoveOps';
+    const startTime = Date.now();
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Entering ${methodName}. Compact counter: ${this.compactCounter}`);
+
     if (this.compactCounter < COMPACT_OPERATION_INTERVAL) {
+      const duration = Date.now() - startTime;
+      this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Exiting ${methodName} (skipped due to counter). Duration: ${duration}ms.`);
       return;
     }
 
     await this.writeTransaction(async (tx) => {
+      const txStartTime = Date.now();
       await tx.execute('INSERT INTO powersync_operations(op, data) VALUES (?, ?)', ['clear_remove_ops', '']);
+      const txDuration = Date.now() - txStartTime;
+      this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${methodName}] Executed clear_remove_ops operation. Transaction duration: ${txDuration}ms.`);
     });
     this.compactCounter = 0;
+
+    const duration = Date.now() - startTime;
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Exiting ${methodName}. Duration: ${duration}ms.`);
   }
 
   async updateLocalTarget(cb: () => Promise<string>): Promise<boolean> {
+    const methodName = 'updateLocalTarget';
+    const startTime = Date.now();
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Entering ${methodName}.`);
+
     const rs1 = await this.db.getAll(
       "SELECT target_op FROM ps_buckets WHERE name = '$local' AND target_op = CAST(? as INTEGER)",
       [MAX_OP_ID]
@@ -290,38 +399,41 @@ export class SqliteBucketStorage extends BaseObserver<BucketStorageListener> imp
 
     const seqBefore: number = rs[0]['seq'];
 
-    const opId = await cb();
+    const opId = await cb(); // cb() is external, cannot log its internals here
 
-    this.logger.debug(`[updateLocalTarget] Updating target to checkpoint ${opId}`);
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${methodName}] Callback provided opId: ${opId}. Proceeding with transaction.`);
 
-    return this.writeTransaction(async (tx) => {
+    const result = await this.writeTransaction(async (tx) => {
+      const txStartTime = Date.now();
       const anyData = await tx.execute('SELECT 1 FROM ps_crud LIMIT 1');
       if (anyData.rows?.length) {
-        // if isNotEmpty
-        this.logger.debug('updateLocalTarget', 'ps crud is not empty');
+        this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${methodName}] ps_crud is not empty, aborting update. Transaction duration: ${Date.now() - txStartTime}ms.`);
         return false;
       }
 
-      const rs = await tx.execute("SELECT seq FROM sqlite_sequence WHERE name = 'ps_crud'");
-      if (!rs.rows?.length) {
-        // assert isNotEmpty
-        throw new Error('SQlite Sequence should not be empty');
+      const rsSeq = await tx.execute("SELECT seq FROM sqlite_sequence WHERE name = 'ps_crud'");
+      if (!rsSeq.rows?.length) {
+        const txDuration = Date.now() - txStartTime;
+        this.logger.error(`[PowerSyncSDK][SqliteBucketStorage][${methodName}] SQLite sequence for ps_crud not found. Transaction duration: ${txDuration}ms.`);
+        throw new Error('SQLite Sequence for ps_crud should not be empty');
       }
 
-      const seqAfter: number = rs.rows?.item(0)['seq'];
-      this.logger.debug('seqAfter', JSON.stringify(rs.rows?.item(0)));
+      const seqAfter: number = rsSeq.rows?.item(0)['seq'];
       if (seqAfter != seqBefore) {
-        this.logger.debug('seqAfter != seqBefore', seqAfter, seqBefore);
-        // New crud data may have been uploaded since we got the checkpoint. Abort.
+        this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${methodName}] ps_crud sequence changed (before: ${seqBefore}, after: ${seqAfter}), aborting update. Transaction duration: ${Date.now() - txStartTime}ms.`);
         return false;
       }
 
       const response = await tx.execute("UPDATE ps_buckets SET target_op = CAST(? as INTEGER) WHERE name='$local'", [
         opId
       ]);
-      this.logger.debug(['[updateLocalTarget] Response from updating target_op ', JSON.stringify(response)]);
+      this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${methodName}] Updated ps_buckets target_op. Response: ${JSON.stringify(response)}. Transaction duration: ${Date.now() - txStartTime}ms.`);
       return true;
     });
+
+    const duration = Date.now() - startTime;
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Exiting ${methodName}. Result: ${result}. Duration: ${duration}ms.`);
+    return result;
   }
 
   async nextCrudItem(): Promise<CrudEntry | undefined> {
@@ -342,9 +454,15 @@ export class SqliteBucketStorage extends BaseObserver<BucketStorageListener> imp
    * When the objects are successfully sent to the server, call .complete()
    */
   async getCrudBatch(limit: number = 100): Promise<CrudBatch | null> {
-    if (!(await this.hasCrud())) {
+    if (!(await this.hasCrud())) { // hasCrud has its own basic logging
       return null;
     }
+
+    // This method doesn't directly involve a writeTransaction itself, but its `complete` callback does.
+    // So, minimal logging for the main part of getCrudBatch.
+    const methodName = 'getCrudBatch';
+    const startTime = Date.now();
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Entering ${methodName}. Limit: ${limit}`);
 
     const crudResult = await this.db.getAll<CrudEntryJSON>('SELECT * FROM ps_crud ORDER BY id ASC LIMIT ?', [limit]);
 
@@ -360,25 +478,47 @@ export class SqliteBucketStorage extends BaseObserver<BucketStorageListener> imp
     const last = all[all.length - 1];
     return {
       crud: all,
-      haveMore: true,
+      haveMore: true, // This is not always true, it should be `all.length == limit` if we fetch limit+1
       complete: async (writeCheckpoint?: string) => {
-        return this.writeTransaction(async (tx) => {
+        const completeMethodName = 'getCrudBatch.complete';
+        const completeStartTime = Date.now();
+        this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Entering ${completeMethodName}. WriteCheckpoint: ${writeCheckpoint}, LastClientID: ${last.clientId}`);
+
+        const result = await this.writeTransaction(async (tx) => {
+          const txStartTime = Date.now();
           await tx.execute('DELETE FROM ps_crud WHERE id <= ?', [last.clientId]);
+          this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${completeMethodName}] Deleted processed CRUD items up to ID ${last.clientId}.`);
+
           if (writeCheckpoint) {
-            const crudResult = await tx.execute('SELECT 1 FROM ps_crud LIMIT 1');
-            if (crudResult.rows?.length) {
+            const crudCheckResult = await tx.execute('SELECT 1 FROM ps_crud LIMIT 1');
+            if (!crudCheckResult.rows?.length) { // Corrected logic: if ps_crud is NOW empty
               await tx.execute("UPDATE ps_buckets SET target_op = CAST(? as INTEGER) WHERE name='$local'", [
                 writeCheckpoint
               ]);
+              this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${completeMethodName}] ps_crud is empty, updated $local bucket target_op to ${writeCheckpoint}.`);
+            } else {
+              this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${completeMethodName}] ps_crud is NOT empty, $local bucket target_op not updated with writeCheckpoint.`);
             }
           } else {
+            // Original logic: always update if no writeCheckpoint, regardless of ps_crud content.
+            // This seems to be the intended behavior for clearing the slate if no specific checkpoint is given.
             await tx.execute("UPDATE ps_buckets SET target_op = CAST(? as INTEGER) WHERE name='$local'", [
               this.getMaxOpId()
             ]);
+            this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${completeMethodName}] No writeCheckpoint provided, updated $local bucket target_op to MAX_OP_ID.`);
           }
+          const txDuration = Date.now() - txStartTime;
+          this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage][${completeMethodName}] Transaction finished. Duration: ${txDuration}ms.`);
         });
+        const completeDuration = Date.now() - completeStartTime;
+        this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Exiting ${completeMethodName}. Duration: ${completeDuration}ms.`);
+        return result;
       }
     };
+    // Add exit log for the main getCrudBatch method
+    const duration = Date.now() - startTime;
+    this.logger.debug(`[PowerSyncSDK][SqliteBucketStorage] Exiting ${methodName}. Crud items fetched: ${all.length}. Duration: ${duration}ms.`);
+    return batch; // Return the constructed batch object
   }
 
   async writeTransaction<T>(callback: (tx: Transaction) => Promise<T>, options?: { timeoutMs: number }): Promise<T> {
