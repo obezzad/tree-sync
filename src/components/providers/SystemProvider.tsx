@@ -2,7 +2,7 @@
 
 import { PowerSyncContext } from '@powersync/react';
 import { observer } from 'mobx-react-lite';
-import React, { Suspense, useEffect } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import store from '@/stores/RootStore';
 
@@ -15,8 +15,10 @@ export const LoadingSpinner = () => (
 export const SystemProvider = observer(({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const isLoginPage = pathname === '/login';
+  const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
+    setHasMounted(true);
     // Ensure store is initialized on mount
     if (!isLoginPage && !store.isFullyInitialized) {
       store.restoreSession?.();
@@ -28,7 +30,7 @@ export const SystemProvider = observer(({ children }: { children: React.ReactNod
     return children;
   }
 
-  if (!store.db) {
+  if (!hasMounted || !store.db) {
     return <LoadingSpinner />;
   }
 
