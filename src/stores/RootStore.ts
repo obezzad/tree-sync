@@ -81,13 +81,26 @@ export class RootStore {
 
     reaction(
       () => [this._syncedNodes],
-      () => {
+      (newValue, previousValue) => {
         if (!this.db?.currentStatus.hasSynced) {
-          console.log(
-            "%cReconnect DB with updated nodes",
-            "color: lime"
-          )
-          this.connectDb();
+          const currentNodes = newValue[0] as string[];
+          const previousNodes = previousValue?.[0] as string[] || [];
+
+          const hasNewNodes = currentNodes.some(node => !previousNodes.includes(node));
+          const hasRemovedNodes = previousNodes.some(node => !currentNodes.includes(node));
+
+          if (hasNewNodes || hasRemovedNodes) {
+            console.log(
+              "%cReconnect DB with updated nodes",
+              "color: lime"
+            )
+            this.connectDb();
+          } else {
+            console.log(
+              "%cSkipping reconnect - nodes already selected",
+              "color: orange"
+            )
+          }
         }
       }
     )
