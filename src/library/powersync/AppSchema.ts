@@ -11,7 +11,17 @@ const nodes = new Table(
     archived_at: column.text,
     _is_pending: column.integer,
   },
-  { indexes: {} }
+  {
+    indexes: {
+      user_id_idx: ['user_id'],
+      parent_id_idx: ['parent_id'],
+      user_parent_idx: ['user_id', 'parent_id'],
+      user_archived_idx: ['user_id', 'archived_at'],
+      user_created_idx: ['user_id', 'created_at'],
+      user_parent_created_idx: ['user_id', 'parent_id', 'created_at'],
+      user_pending_idx: ['user_id', '_is_pending'],
+    }
+  }
 );
 
 const mutations = new Table(
