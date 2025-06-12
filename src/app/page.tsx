@@ -86,7 +86,7 @@ const Home = observer(() => {
 
   useEffect(() => {
     if (!store.selectedNodeId) {
-      store.selectedNodeId = uuidv5("ROOT_NODE", userService.getUserId())
+      store.setSelectedNodeId(uuidv5("ROOT_NODE", userService.getUserId()));
     }
   }, []);
 

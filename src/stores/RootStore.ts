@@ -49,7 +49,7 @@ export class RootStore {
     reaction(
       () => this.seed,
       () => {
-        this.selectedNodeId = uuidv5("ROOT_NODE", userService.getUserId());
+        this.setSelectedNodeId(uuidv5("ROOT_NODE", userService.getUserId()));
       }
     )
 
@@ -274,6 +274,12 @@ export class RootStore {
     runInAction(() => {
       this.isFocusedView = enabled;
       this.persistState();
+    });
+  }
+
+  setSelectedNodeId(nodeId: string | null) {
+    runInAction(() => {
+      this.selectedNodeId = nodeId;
     });
   }
 

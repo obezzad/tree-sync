@@ -145,7 +145,7 @@ export const TreeNode = observer(({
         ].join(' ')}
         onClick={(e) => {
           e.stopPropagation();
-          rootStore.selectedNodeId = node.id;
+          rootStore.setSelectedNodeId(node.id);
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}

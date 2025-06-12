@@ -44,9 +44,7 @@ export class NodeService {
       }
     });
 
-    runInAction(() => {
-      store.selectedNodeId = data.parent_id!;
-    });
+    store.setSelectedNodeId(data.parent_id!);
   }
 
   async moveNode(nodeId: string, newParentId: string | null) {
@@ -100,9 +98,7 @@ export class NodeService {
     });
     console.log('[NodeService] moveNode DONE');
 
-    runInAction(() => {
-      store.selectedNodeId = newParentId;
-    });
+    store.setSelectedNodeId(newParentId);
   }
 
   async deleteNode(node_id: string) {
