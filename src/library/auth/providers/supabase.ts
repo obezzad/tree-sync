@@ -103,6 +103,10 @@ export class SupabaseAuthProvider implements AuthProvider {
     }
   }
 
+  get client() {
+    return this.supabaseClient;
+  }
+
   static getUsernameFromSession(session: Session): string {
     if (!session?.user?.user_metadata?.username) {
       throw new Error('Failed to extract username from session');

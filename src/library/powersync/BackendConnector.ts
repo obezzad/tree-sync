@@ -1,13 +1,12 @@
 import { AbstractPowerSyncDatabase, PowerSyncBackendConnector, UpdateType } from '@powersync/web';
 import store from '@/stores/RootStore';
-import { initializeAuthStore } from '@/stores/AuthStore';
+import { authService } from '@/library/auth/authService';
 import { userService } from '@/library/powersync/userService';
 import { Database } from './AppSchema';
 
 class BackendConnector implements PowerSyncBackendConnector {
   private syncEndpoint: string | undefined;
   private powersyncUrl: string | undefined;
-  private authStore = initializeAuthStore();
 
   constructor() {
     this.syncEndpoint = `${process.env.NEXT_PUBLIC_API_ENDPOINT}/sync`;
@@ -81,7 +80,7 @@ class BackendConnector implements PowerSyncBackendConnector {
         }
       }
 
-      const { data, error } = await this.authStore.supabase.rpc(name, { ...parsed_args });
+      const { data, error } = await authService.supabaseClient.rpc(name, { ...parsed_args });
 
       if (error) {
         console.error('Failed to process mutation:', error, data);

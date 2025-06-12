@@ -38,6 +38,10 @@ class AuthService {
     }
   }
 
+  get supabaseClient() {
+    return (this.provider as SupabaseAuthProvider).client;
+  }
+
   // Expose provider-specific utilities
   static getUsernameFromSession(session: Session): string {
     return SupabaseAuthProvider.getUsernameFromSession(session);
