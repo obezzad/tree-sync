@@ -56,44 +56,12 @@ export class NodeService {
         new_parent_id: newParentId
       },
       optimisticUpdate: async (tx: Transaction) => {
-        // Hack: simple parent update without recursion to test performance
-        console.log('[NodeService] optimisticUpdate HACK simple UPDATE');
+        // HACK: Simple and efficient optimistic parent update without recursion
         const updateResult = await tx.execute(
           `UPDATE nodes SET parent_id = ? WHERE id = ? RETURNING id`,
           [newParentId, nodeId]
         );
         return updateResult.rows?._array.map(row => row.id) ?? [];
-        // Original recursive CTE logic commented out for testing
-        /*
-        console.log('[NodeService] optimisticUpdate move_node START');
-        console.time('move_node SQL');
-        const updateResult = await tx.execute(`
-          WITH RECURSIVE ancestors AS (
-            -- Base: start with the proposed new parent
-            SELECT id, parent_id
-            FROM nodes
-            WHERE id = ? AND ? IS NOT NULL  -- only do this check if new_parent_id is not NULL
-
-            UNION ALL
-
-            -- Recursive: keep getting parents until reaching root
-            SELECT n.id, n.parent_id
-            FROM nodes n
-            JOIN ancestors a ON n.id = a.parent_id
-          )
-          UPDATE nodes
-          SET parent_id = ? -- new_parent_id
-          WHERE id = ?      -- node_id_to_move
-          AND (
-            ? IS NULL  -- Allow moving to root
-            OR ? NOT IN (SELECT id FROM ancestors)  -- Check ancestors if not moving to root
-        )
-          RETURNING id;`, [newParentId, newParentId, newParentId, nodeId, newParentId, nodeId]);
-        console.timeEnd('move_node SQL');
-        console.log('[NodeService] optimisticUpdate move_node END');
-
-        return updateResult.rows?._array.map(row => row.id) ?? [];
-        */
       }
     });
     console.log('[NodeService] moveNode DONE');

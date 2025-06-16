@@ -74,6 +74,15 @@ const Home = observer(() => {
   const { data: pendingUpload } = useQuery('select count(distinct tx_id) as count from ps_crud');
   const { downloadProgress, dataFlowStatus, connected, hasSynced } = useStatus();
 
+  console.debug('Query results:', {
+    allNodes: allNodes?.[0]?.count,
+    userNodes: userNodes?.[0]?.count,
+    remoteNodes: remoteNodes?.[0]?.count,
+    nodesLength: nodes?.length,
+    selectedNodeId: store.selectedNodeId,
+    local_id
+  });
+
   const [remoteCount, setRemoteCount] = useState<number | null>(null);
 
   useEffect(() => {

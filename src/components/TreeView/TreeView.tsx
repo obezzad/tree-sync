@@ -51,6 +51,14 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
     }
   }, [nodes]);
 
+  const nodeMap = useMemo(() => {
+    const map = new Map<string, Node>();
+    nodes.forEach(node => {
+      map.set(node.id, node);
+    });
+    return map;
+  }, [nodes]);
+
   const treeData = useMemo(() => {
     const nodeMap = new Map<string | null, Node[]>();
 
@@ -124,46 +132,42 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
     }
   }, [rootStore.selectedNodeId, flattenedNodes]);
 
-  const isNodeInSubtree = useCallback((nodeId: string, subtreeRoot: TreeNodeData): boolean => {
-    if (subtreeRoot.id === nodeId) return true;
-    return subtreeRoot.children.some(child => isNodeInSubtree(nodeId, child));
-  }, []);
-
-  const findNode = useCallback((nodeId: string, tree: TreeNodeData[]): TreeNodeData | null => {
-    for (const node of tree) {
-      if (node.id === nodeId) return node;
-      const found = findNode(nodeId, node.children);
-      if (found) return found;
+  const isNodeAncestorOf = useCallback((potentialAncestorId: string, nodeId: string): boolean => {
+    let currentNode = nodeMap.get(nodeId);
+    while (currentNode && currentNode.parent_id) {
+      if (currentNode.parent_id === potentialAncestorId) {
+        return true;
+      }
+      currentNode = nodeMap.get(currentNode.parent_id);
     }
-    return null;
-  }, []);
+    return false;
+  }, [nodeMap]);
 
   const handleMove = useCallback(async (sourceId: string, targetId: string, position: 'before' | 'after' | 'inside') => {
     console.log('👉 handleMove(', sourceId, ',', targetId, ',', position, ')');
     if (readOnly) return;
 
-    const sourceNode = findNode(sourceId, treeData);
-    const targetNode = findNode(targetId, treeData);
+    const sourceNode = nodeMap.get(sourceId);
+    const targetNode = nodeMap.get(targetId);
 
     if (!sourceNode || !targetNode) {
       toast.error('Unable to move node: Node not found');
       return;
     }
 
-    // Prevent moving a node into its own subtree
-    if (isNodeInSubtree(targetId, sourceNode)) {
+    if (sourceId === targetId || isNodeAncestorOf(sourceId, targetId)) {
       toast.error('Cannot move a node into its own subtree');
       return;
     }
 
     try {
-      console.log('   calling nodeService.moveNode…');
+      console.debug('   calling nodeService.moveNode…');
       if (position !== 'inside') {
         throw new Error('Siblings reordering is not supported yet');
       }
 
       await nodeService.moveNode(sourceId, targetId);
-      console.log('   moveNode resolved');
+      console.debug('   moveNode resolved');
 
       if (targetId === null && !collapsedRootIdsRef.current.has(sourceId)) {
         setCollapsedNodes(prev => {
@@ -179,7 +183,7 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
       console.error('Failed to move node:', error);
       toast.error(error.message ?? 'Failed to move node');
     }
-  }, [readOnly, treeData, nodeService, findNode, isNodeInSubtree]);
+  }, [readOnly, nodeMap, nodeService, isNodeAncestorOf]);
 
   const handleAddNode = useCallback(async (parentId: string | null) => {
     if (readOnly) return;
@@ -274,7 +278,6 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
             }}
             className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 bg-gray-100 rounded flex items-center gap-1"
           >
-            {/* {treeStore.collapsedNodes.size === 0 ? ( */}
             {collapsedNodes.size === 0 ? (
               <>
                 <ChevronDown className="w-4 h-4" />
