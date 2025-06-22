@@ -10,6 +10,7 @@ import { userService } from '@/library/powersync/userService';
 
 export interface TestResult {
 	name: string;
+	key: string;
 	runs: number[];
 	average: number;
 }
@@ -92,7 +93,7 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>
 				}
 			}
 			const average = runs.reduce((a, b) => a + b, 0) / runs.length;
-			onNewResult({ name: test.title, runs, average });
+			onNewResult({ name: test.title, key, runs, average });
 		}
 		onTestsComplete();
 	};
@@ -138,7 +139,10 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>
 							}`}
 						>
 							<div className="flex justify-between items-start mb-2">
-								<span className="font-medium">{result.name}</span>
+								<div>
+									<span className="font-medium">{result.name}</span>
+									<div className="text-xs font-mono text-gray-500 mt-1">{result.key}</div>
+								</div>
 								<div
 									className={`text-lg font-bold ${
 										result.average > 100

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { usePowerSync } from '@powersync/react';
 import { useQuery, useStatus } from '@powersync/react';
 import store from '@/stores/RootStore';
@@ -12,51 +12,51 @@ const UseQueryBenchmarks = observer(({ local_id }: { local_id: string }) => {
 	const [timings, setTimings] = useState<{ [key: string]: number | null }>({});
 	const allTimingsRecorded = useRef(false);
 
-	const benchmarkQueries = {
-		'Time to First Count All Nodes': {
+	const benchmarkQueries = useMemo(() => ({
+		countAllNodes: {
 			query: queries.countAllNodes,
 			params: [],
 			isReady: (data: any) => data && data[0] && data[0].count > 0,
 		},
-		'Time to First Count User Nodes': {
+		countUserNodes: {
 			query: queries.countUserNodes,
 			params: [local_id],
 			isReady: (data: any) => data && data[0] && data[0].count > 0,
 		},
-		'Time to First Fetched Sample': {
+		getSampleNodes: {
 			query: queries.getSampleNodes,
 			params: [local_id],
 			isReady: (data: any) => data && data.length > 0,
 		}
-	};
+	}), [local_id]);
 
 	// --- Query 1 ---
 	const startTime1 = useRef(performance.now());
-	const { data: allNodes } = useQuery(benchmarkQueries['Time to First Count All Nodes'].query.sql);
+	const { data: allNodes } = useQuery(benchmarkQueries.countAllNodes.query.sql);
 	useEffect(() => {
-		if (benchmarkQueries['Time to First Count All Nodes'].isReady(allNodes) && timings['Time to First Count All Nodes'] === undefined) {
+		if (benchmarkQueries.countAllNodes.isReady(allNodes) && timings.countAllNodes === undefined) {
 			const time = performance.now() - startTime1.current;
-			setTimings(prev => ({ ...prev, 'Time to First Count All Nodes': time }));
+			setTimings(prev => ({ ...prev, countAllNodes: time }));
 		}
 	}, [allNodes]);
 
 	// --- Query 2 ---
 	const startTime2 = useRef(performance.now());
-	const { data: userNodes } = useQuery(benchmarkQueries['Time to First Count User Nodes'].query.sql, [local_id]);
+	const { data: userNodes } = useQuery(benchmarkQueries.countUserNodes.query.sql, [local_id]);
 	useEffect(() => {
-		if (benchmarkQueries['Time to First Count User Nodes'].isReady(userNodes) && timings['Time to First Count User Nodes'] === undefined) {
+		if (benchmarkQueries.countUserNodes.isReady(userNodes) && timings.countUserNodes === undefined) {
 			const time = performance.now() - startTime2.current;
-			setTimings(prev => ({ ...prev, 'Time to First Count User Nodes': time }));
+			setTimings(prev => ({ ...prev, countUserNodes: time }));
 		}
 	}, [userNodes]);
 
 	// --- Query 3 ---
 	const startTime3 = useRef(performance.now());
-	const { data: sampleNodes } = useQuery(benchmarkQueries['Time to First Fetched Sample'].query.sql, [local_id]);
+	const { data: sampleNodes } = useQuery(benchmarkQueries.getSampleNodes.query.sql, [local_id]);
 	useEffect(() => {
-		if (benchmarkQueries['Time to First Fetched Sample'].isReady(sampleNodes) && timings['Time to First Fetched Sample'] === undefined) {
+		if (benchmarkQueries.getSampleNodes.isReady(sampleNodes) && timings.getSampleNodes === undefined) {
 			const time = performance.now() - startTime3.current;
-			setTimings(prev => ({ ...prev, 'Time to First Fetched Sample': time }));
+			setTimings(prev => ({ ...prev, getSampleNodes: time }));
 		}
 	}, [sampleNodes]);
 
@@ -66,12 +66,15 @@ const UseQueryBenchmarks = observer(({ local_id }: { local_id: string }) => {
 		if (recordedCount === Object.keys(benchmarkQueries).length && !allTimingsRecorded.current) {
 			allTimingsRecorded.current = true;
 			console.log('=== USEQUERY TIME TO FIRST DATA ===');
-			Object.entries(timings).forEach(([query, time]) => {
-				console.log(`${query}: ${(time! / 1000).toFixed(2)}s`);
+			Object.entries(benchmarkQueries).forEach(([key, benchmark]) => {
+				const time = timings[key];
+				if (time) {
+					console.log(`${benchmark.query.title} (${key}): ${(time! / 1000).toFixed(2)}s`);
+				}
 			});
 			console.log('====================================');
 		}
-	}, [timings]);
+	}, [timings, benchmarkQueries]);
 
 	return (
 		<>
@@ -86,11 +89,14 @@ const UseQueryBenchmarks = observer(({ local_id }: { local_id: string }) => {
 				<div className="mt-4 pt-4 border-t border-blue-200">
 					<h4 className="font-semibold mb-2 text-md">Time to First Data</h4>
 					<div className="space-y-1 text-sm">
-						{Object.keys(benchmarkQueries).map((name) => (
-							<div key={name} className="flex justify-between">
-								<span>{name}:</span>
+						{Object.entries(benchmarkQueries).map(([key, benchmark]) => (
+							<div key={key} className="flex justify-between items-center">
+								<div>
+									<div className="font-medium">{benchmark.query.title}</div>
+									<div className="text-xs text-gray-500 font-mono">{key}</div>
+								</div>
 								<span className="font-bold font-mono">
-									{timings[name] != null ? `${((timings[name] as number)/1000).toFixed(2)}s` : 'Waiting for data...'}
+									{timings[key] != null ? `${((timings[key] as number)/1000).toFixed(2)}s` : 'Waiting for data...'}
 								</span>
 							</div>
 						))}
