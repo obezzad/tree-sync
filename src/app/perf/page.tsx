@@ -5,7 +5,7 @@ import { usePowerSync } from '@powersync/react';
 import { useQuery, useStatus } from '@powersync/react';
 import store from '@/stores/RootStore';
 import { observer } from 'mobx-react-lite';
-import { SimplePerfTest, SimplePerfTestRef } from '@/components/SimplePerfTest';
+import { SimplePerfTest, SimplePerfTestRef, TestResult } from '@/components/SimplePerfTest';
 
 const PerfPage = observer(() => {
 	const db = usePowerSync();
@@ -16,6 +16,8 @@ const PerfPage = observer(() => {
 	const [timeToSynced, setTimeToSynced] = useState<number | null>(null);
 	const [timeToReady, setTimeToReady] = useState<number | null>(null);
 	const [timeToFirstSync, setTimeToFirstSync] = useState<number | null>(null);
+	const [perfTestResults, setPerfTestResults] = useState<TestResult[]>([]);
+	const [isPerfTestRunning, setIsPerfTestRunning] = useState(false);
 
 	if (!db) throw new Error('PowerSync context not found');
 
@@ -42,6 +44,19 @@ const PerfPage = observer(() => {
 	const endTime4 = performance.now();
 
 	const { connected, hasSynced } = useStatus();
+
+	const handleTestsStart = () => {
+		setPerfTestResults([]);
+		setIsPerfTestRunning(true);
+	};
+
+	const handleNewResult = (result: TestResult) => {
+		setPerfTestResults(prevResults => [...prevResults, result]);
+	};
+
+	const handleTestsComplete = () => {
+		setIsPerfTestRunning(false);
+	};
 
 	useEffect(() => {
 		mountTimeRef.current = performance.now();
@@ -143,7 +158,14 @@ const PerfPage = observer(() => {
 				</div>
 			</div>
 
-			<SimplePerfTest ref={perfTestRef} />
+			<SimplePerfTest
+				ref={perfTestRef}
+				testResults={perfTestResults}
+				isRunning={isPerfTestRunning}
+				onNewResult={handleNewResult}
+				onTestsStart={handleTestsStart}
+				onTestsComplete={handleTestsComplete}
+			/>
 
 			<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
 				<h2 className="text-lg font-bold mb-2">Performance Analysis Guide</h2>

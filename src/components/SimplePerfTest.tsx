@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
+import { forwardRef, useImperativeHandle } from 'react';
 import { usePowerSync } from '@powersync/react';
 import { AbstractPowerSyncDatabase } from '@powersync/web';
 import store from '@/stores/RootStore';
@@ -8,7 +8,7 @@ import { queries } from '@/library/powersync/queries';
 import { v5 as uuidv5 } from 'uuid';
 import { userService } from '@/library/powersync/userService';
 
-interface TestResult {
+export interface TestResult {
 	name: string;
 	runs: number[];
 	average: number;
@@ -18,16 +18,24 @@ export interface SimplePerfTestRef {
 	runTests: () => void;
 }
 
-export const SimplePerfTest = forwardRef<SimplePerfTestRef, {}>((props, ref) => {
+interface SimplePerfTestProps {
+	testResults: TestResult[];
+	isRunning: boolean;
+	onNewResult: (result: TestResult) => void;
+	onTestsStart: () => void;
+	onTestsComplete: () => void;
+}
+
+export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>((
+	{ testResults, isRunning, onNewResult, onTestsStart, onTestsComplete },
+	ref
+) => {
 	const db = usePowerSync() as AbstractPowerSyncDatabase;
-	const [testResults, setTestResults] = useState<TestResult[]>([]);
-	const [isRunning, setIsRunning] = useState(false);
 
 	const runTests = async () => {
 		if (!db || isRunning) return;
 
-		setIsRunning(true);
-		setTestResults([]);
+		onTestsStart();
 		const local_id = store.session?.user?.user_metadata?.local_id;
 		const rootNodeId = uuidv5('ROOT_NODE', userService.getUserId());
 
@@ -46,8 +54,6 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, {}>((props, ref) => 
 			}
 		];
 
-		const allTestResults: TestResult[] = [];
-
 		for (const test of tests) {
 			const runs: number[] = [];
 			for (let i = 0; i < 3; i++) {
@@ -58,10 +64,9 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, {}>((props, ref) => 
 				await new Promise(resolve => setTimeout(resolve, 50)); // Small delay between runs
 			}
 			const average = runs.reduce((a, b) => a + b, 0) / runs.length;
-			allTestResults.push({ name: test.name, runs, average });
+			onNewResult({ name: test.name, runs, average });
 		}
-		setTestResults(allTestResults);
-		setIsRunning(false);
+		onTestsComplete();
 	};
 
 	useImperativeHandle(ref, () => ({
@@ -91,7 +96,7 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, {}>((props, ref) => 
 				<div className="mt-4 text-blue-600">Running tests...</div>
 			)}
 
-			{testResults.length > 0 && !isRunning && (
+			{testResults.length > 0 && (
 				<div className="space-y-4 mt-4">
 					{testResults.map((result, index) => (
 						<div
