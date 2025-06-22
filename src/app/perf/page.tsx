@@ -8,65 +8,80 @@ import { observer } from 'mobx-react-lite';
 import { SimplePerfTest, SimplePerfTestRef, TestResult } from '@/components/SimplePerfTest';
 import { queries } from '@/library/powersync/queries';
 
+const useQueryBenchmarkQueries = Object.entries(queries).filter(
+	([, query]) => !query.isMutation && (query.params.length === 0 || (query.params.length === 1 && query.params.includes('userId')))
+).reduce((acc, [key, query]) => {
+	acc[key] = {
+		query,
+		isReady: (data: any) => {
+			if (!data) return false;
+			if (Array.isArray(data)) return data.length > 0;
+			if (typeof data[0]?.count === 'number') return data[0].count > 0;
+			return false;
+		}
+	}
+	return acc;
+}, {} as { [key: string]: { query: typeof queries[string], isReady: (data: any) => boolean } });
+
+
+const SingleQueryBenchmark = ({
+	queryKey,
+	query,
+	params,
+	isReady,
+	onTimingComplete,
+	initialTiming
+}: {
+	queryKey: string;
+	query: { title: string; sql: string },
+	params: any[],
+	isReady: (data: any) => boolean,
+	onTimingComplete: (key: string, time: number) => void,
+	initialTiming: number | null
+}) => {
+	const startTime = useRef(performance.now());
+	const { data } = useQuery(query.sql, params);
+
+	useEffect(() => {
+		if (initialTiming == null && isReady(data)) {
+			const time = performance.now() - startTime.current;
+			onTimingComplete(queryKey, time);
+		}
+	}, [data, isReady, onTimingComplete, queryKey, initialTiming]);
+
+	return (
+		<div className="flex justify-between items-center">
+			<div>
+				<div className="font-medium">{query.title}</div>
+				<div className="text-xs text-gray-500 font-mono">{queryKey}</div>
+			</div>
+			<span className="font-bold font-mono">
+				{initialTiming != null ? `${(initialTiming / 1000).toFixed(2)}s` : 'Waiting for data...'}
+			</span>
+		</div>
+	)
+};
+
 const UseQueryBenchmarks = observer(({ local_id }: { local_id: string }) => {
 	const [timings, setTimings] = useState<{ [key: string]: number | null }>({});
 	const allTimingsRecorded = useRef(false);
 
-	const benchmarkQueries = useMemo(() => ({
-		countAllNodes: {
-			query: queries.countAllNodes,
-			params: [],
-			isReady: (data: any) => data && data[0] && data[0].count > 0,
-		},
-		countUserNodes: {
-			query: queries.countUserNodes,
-			params: [local_id],
-			isReady: (data: any) => data && data[0] && data[0].count > 0,
-		},
-		getSampleNodes: {
-			query: queries.getSampleNodes,
-			params: [local_id],
-			isReady: (data: any) => data && data.length > 0,
-		}
-	}), [local_id]);
-
-	// --- Query 1 ---
-	const startTime1 = useRef(performance.now());
-	const { data: allNodes } = useQuery(benchmarkQueries.countAllNodes.query.sql);
-	useEffect(() => {
-		if (benchmarkQueries.countAllNodes.isReady(allNodes) && timings.countAllNodes === undefined) {
-			const time = performance.now() - startTime1.current;
-			setTimings(prev => ({ ...prev, countAllNodes: time }));
-		}
-	}, [allNodes]);
-
-	// --- Query 2 ---
-	const startTime2 = useRef(performance.now());
-	const { data: userNodes } = useQuery(benchmarkQueries.countUserNodes.query.sql, [local_id]);
-	useEffect(() => {
-		if (benchmarkQueries.countUserNodes.isReady(userNodes) && timings.countUserNodes === undefined) {
-			const time = performance.now() - startTime2.current;
-			setTimings(prev => ({ ...prev, countUserNodes: time }));
-		}
-	}, [userNodes]);
-
-	// --- Query 3 ---
-	const startTime3 = useRef(performance.now());
-	const { data: sampleNodes } = useQuery(benchmarkQueries.getSampleNodes.query.sql, [local_id]);
-	useEffect(() => {
-		if (benchmarkQueries.getSampleNodes.isReady(sampleNodes) && timings.getSampleNodes === undefined) {
-			const time = performance.now() - startTime3.current;
-			setTimings(prev => ({ ...prev, getSampleNodes: time }));
-		}
-	}, [sampleNodes]);
+	const handleTimingComplete = (key: string, time: number) => {
+		setTimings(prev => {
+			if (prev[key] == null) {
+				return { ...prev, [key]: time };
+			}
+			return prev;
+		});
+	};
 
 	// Log to console when all timings are available
 	useEffect(() => {
 		const recordedCount = Object.values(timings).filter(t => t !== null).length;
-		if (recordedCount === Object.keys(benchmarkQueries).length && !allTimingsRecorded.current) {
+		if (recordedCount === Object.keys(useQueryBenchmarkQueries).length && !allTimingsRecorded.current) {
 			allTimingsRecorded.current = true;
 			console.log('=== USEQUERY TIME TO FIRST DATA ===');
-			Object.entries(benchmarkQueries).forEach(([key, benchmark]) => {
+			Object.entries(useQueryBenchmarkQueries).forEach(([key, benchmark]) => {
 				const time = timings[key];
 				if (time) {
 					console.log(`${benchmark.query.title} (${key}): ${(time! / 1000).toFixed(2)}s`);
@@ -74,41 +89,27 @@ const UseQueryBenchmarks = observer(({ local_id }: { local_id: string }) => {
 			});
 			console.log('====================================');
 		}
-	}, [timings, benchmarkQueries]);
+	}, [timings]);
+
+	const queryEntries = useMemo(() => Object.entries(useQueryBenchmarkQueries), []);
 
 	return (
 		<>
 			<div className="mb-6 p-4 bg-blue-50 rounded">
-				<h3 className="text-lg font-semibold mb-2">PowerSync useQuery Results</h3>
-				<div className="grid grid-cols-2 gap-4 text-sm">
-					<div>Total Nodes: <span className="font-bold">{allNodes?.[0]?.count ?? 'Loading...'}</span></div>
-					<div>User Nodes: <span className="font-bold">{userNodes?.[0]?.count ?? 'Loading...'}</span></div>
-					<div>Sample Fetched: <span className="font-bold">{sampleNodes?.length ?? 'Loading...'}</span></div>
+				<h3 className="text-lg font-semibold mb-2">PowerSync useQuery Time to First Data</h3>
+				<div className="space-y-1 text-sm">
+					{queryEntries.map(([key, benchmark]) => (
+						<SingleQueryBenchmark
+							key={key}
+							queryKey={key}
+							query={benchmark.query}
+							params={benchmark.query.params.includes('userId') ? [local_id] : []}
+							isReady={benchmark.isReady}
+							onTimingComplete={handleTimingComplete}
+							initialTiming={timings[key] ?? null}
+						/>
+					))}
 				</div>
-
-				<div className="mt-4 pt-4 border-t border-blue-200">
-					<h4 className="font-semibold mb-2 text-md">Time to First Data</h4>
-					<div className="space-y-1 text-sm">
-						{Object.entries(benchmarkQueries).map(([key, benchmark]) => (
-							<div key={key} className="flex justify-between items-center">
-								<div>
-									<div className="font-medium">{benchmark.query.title}</div>
-									<div className="text-xs text-gray-500 font-mono">{key}</div>
-								</div>
-								<span className="font-bold font-mono">
-									{timings[key] != null ? `${((timings[key] as number)/1000).toFixed(2)}s` : 'Waiting for data...'}
-								</span>
-							</div>
-						))}
-					</div>
-				</div>
-			</div>
-
-			<div className="p-4 bg-gray-50 rounded">
-				<h4 className="font-semibold mb-2">Sample Data (First 100 nodes)</h4>
-				<pre className="text-xs overflow-auto max-h-40">
-						{JSON.stringify(sampleNodes, null, 2)}
-					</pre>
 			</div>
 		</>
 	);
