@@ -15,22 +15,16 @@ export interface QueryDefinition {
 	isMutation?: boolean;
 }
 
-const getDescendantsOfNodeQuery = `
-    WITH RECURSIVE descendants(id) AS (
-    SELECT ? AS id
-    UNION ALL
-    SELECT n.id
-    FROM nodes n
-    JOIN descendants d ON n.parent_id = d.id
-    )
-    SELECT id FROM descendants
-`;
-
 export const queries: { [key: string]: QueryDefinition } = {
 	coldStartProbe: {
-		title: 'Cold Start Sanity Check (SELECT 1, should be instant)',
-		sql: 'SELECT 1 as probe',
+		title: 'Cold Start Sanity Check ("SELECT 1", should be <1ms)',
+		sql: 'SELECT 1',
 		params: []
+	},
+	getSampleNodes: {
+		title: 'Fetch Sample Nodes',
+		sql: 'SELECT id, created_at, user_id FROM nodes WHERE user_id = ? LIMIT 100',
+		params: ['userId']
 	},
 	getAllNodeIds: {
 		title: 'List All Node IDs',
@@ -42,9 +36,27 @@ export const queries: { [key: string]: QueryDefinition } = {
 		sql: 'SELECT id FROM nodes WHERE user_id = ?',
 		params: ['userId']
 	},
+	getAllNodes: {
+		title: 'Get All Nodes',
+		sql: 'SELECT * FROM nodes',
+		params: []
+	},
+	getAllNodesForUser: {
+		title: 'Get All Nodes for a User',
+		sql: 'SELECT * FROM nodes WHERE user_id = ?',
+		params: ['userId']
+	},
 	getDescendantsOfNode: {
 		title: 'List All Descendant IDs of Root',
-		sql: getDescendantsOfNodeQuery,
+		sql: `
+	WITH RECURSIVE descendants(id) AS (
+		SELECT ? AS id
+		UNION ALL
+		SELECT n.id
+		FROM nodes n
+		JOIN descendants d ON n.parent_id = d.id
+	)
+	SELECT id FROM descendants`,
 		params: ['rootNodeId']
 	},
 	countAllNodes: {
@@ -57,11 +69,6 @@ export const queries: { [key: string]: QueryDefinition } = {
 		sql: 'SELECT count(*) as count FROM nodes WHERE user_id = ?',
 		params: ['userId']
 	},
-	getSampleNodes: {
-		title: 'Fetch Sample Nodes',
-		sql: 'SELECT id, created_at, user_id FROM nodes WHERE user_id = ? LIMIT 100',
-		params: ['userId']
-	},
 	countPendingUploads: {
 		title: 'Count Pending Uploads',
 		sql: 'select count(distinct tx_id) as count from ps_crud',
@@ -72,65 +79,23 @@ export const queries: { [key: string]: QueryDefinition } = {
 		sql: `SELECT count(DISTINCT bucket) as bucket_count FROM ps_oplog`,
 		params: []
 	},
-	getAllNodes: {
-		title: 'Get All Nodes',
-		sql: 'SELECT * FROM nodes',
-		params: []
-	},
-	getAllNodesForUser: {
-		title: 'Get All Nodes for a User',
-		sql: 'SELECT * FROM nodes WHERE user_id = ?',
+	getTotalNodeSizeForUser: {
+		title: 'Get Total Node Size for User',
+		sql: `SELECT
+        SUM(
+            IFNULL(LENGTH(id), 0) +
+            IFNULL(LENGTH(created_at), 0) +
+            IFNULL(LENGTH(payload), 0) +
+            IFNULL(LENGTH(user_id), 0) +
+            IFNULL(LENGTH(parent_id), 0) +
+            IFNULL(LENGTH(rank), 0) +
+            IFNULL(LENGTH(archived_at), 0)
+        ) as total_size
+        FROM nodes
+        WHERE user_id = ?`,
 		params: ['userId']
 	},
-	getSubtree: {
-		title: 'Query Subtree from Root',
-		sql: `
-    WITH parent AS (
-        SELECT id, parent_id
-        FROM nodes
-        WHERE id = (
-        SELECT parent_id
-        FROM nodes
-        WHERE id = ? AND ? IS NOT NULL
-        )
-    ),
-    siblings AS (
-        SELECT n.id
-        FROM nodes n
-        WHERE n.parent_id = (
-        SELECT parent_id
-        FROM nodes
-        WHERE id = ? AND ? IS NOT NULL
-        )
-    ),
-    children AS (
-        SELECT id
-        FROM nodes
-        WHERE parent_id = ? AND ? IS NOT NULL
-    ),
-    focused_nodes AS (
-        SELECT id FROM parent
-        UNION
-        SELECT id FROM siblings
-        UNION
-        SELECT id FROM children
-        UNION
-        SELECT ? AS id WHERE ? IS NOT NULL
-    )
-    SELECT * FROM nodes
-    WHERE id IN (SELECT id FROM focused_nodes) AND user_id = ?`,
-		params: [
-			'focusedNodeId',
-			'focusedNodeId',
-			'focusedNodeId',
-			'focusedNodeId',
-			'focusedNodeId',
-			'focusedNodeId',
-			'focusedNodeId',
-			'focusedNodeId',
-			'userId'
-		]
-	},
+	// Mutations
 	insertNode: {
 		title: 'Insert New Node',
 		sql: `INSERT INTO nodes (id, created_at, payload, user_id, parent_id, _is_pending)

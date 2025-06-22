@@ -56,7 +56,7 @@ const SingleQueryBenchmark = ({
 	const overheadMs = useQueryTimeMs != null && rawTimeMs != null ? useQueryTimeMs - rawTimeMs : null;
 
 	const overheadColor =
-		overheadMs == null ? '' : overheadMs > 50 ? 'text-red-600' : overheadMs > 20 ? 'text-yellow-600' : 'text-gray-500';
+		overheadMs == null ? '' : overheadMs > 100 ? 'text-red-600' : overheadMs > 50 ? 'text-yellow-600' : 'text-gray-500';
 
 	return (
 		<div className="flex justify-between items-center">
@@ -164,6 +164,12 @@ const PerfPage = observer(() => {
 
 	const { connected, hasSynced } = useStatus();
 
+	const { data: nodeCountData } = useQuery(queries.countUserNodes.sql, local_id ? [local_id] : []);
+	const syncedNodes = nodeCountData?.[0]?.count;
+
+	const { data: totalNodeSizeData } = useQuery(queries.getTotalNodeSizeForUser.sql, local_id ? [local_id] : []);
+	const totalNodeSize = totalNodeSizeData?.[0]?.total_size;
+
 	const handleTestsStart = () => {
 		setPerfTestResults([]);
 		setIsPerfTestRunning(true);
@@ -231,11 +237,11 @@ const PerfPage = observer(() => {
 				<h2 className="text-lg font-bold mb-2">Performance Analysis Guide</h2>
 				<div className="space-y-3 text-sm">
 					<div>
-						<strong>If PowerSync useQuery is slow but raw database is fast:</strong>
+						<strong>If PowerSync useQuery is slow but wrapped database is fast:</strong>
 						<p className="text-gray-700">Problem is in PowerSync's reactive layer, React re-rendering, or change detection overhead.</p>
 					</div>
 					<div>
-						<strong>If both PowerSync and raw database are slow:</strong>
+						<strong>If both PowerSync and wrapped database are slow:</strong>
 						<p className="text-gray-700">Problem is at the database level - check indexes, query optimization, or SQLite configuration.</p>
 					</div>
 					<div>
@@ -260,6 +266,25 @@ const PerfPage = observer(() => {
 							<div>Time to First Sync: <b className="font-mono">{timeToFirstSync !== null ? `${(timeToFirstSync / 1000).toFixed(2)}s` : '...'}</b></div>
 							<div>Time to Connect: <b className="font-mono">{timeToConnected !== null ? `${(timeToConnected / 1000).toFixed(2)}s` : '...'}</b></div>
 						</div>
+						<div className="pt-2">
+							<div className="pt-2 p-3 mb-2 bg-orange-50 border border-orange-200 rounded text-xs">
+								<strong>⚠️ Query Interference:</strong>
+								<p className="mt-1 text-gray-700">
+									All queries run sequentially, leading to slow queries being a considerable bottleneck. <br />
+									This is especially problematic for reactive queries like the two directly below this notice as they re-run on every change. <br />
+								</p>
+								<p className="mt-1 text-gray-700">
+									We're intentionally surfacing this interference on <b>Wrapped Database Performance</b> first (auto-)run to test for this issue and possible solutions.
+								</p>
+							</div>
+							<div>Synced Nodes: <b className="font-mono">{syncedNodes ?? '...'}</b></div>
+							<div>
+								Nodes Data Size (wo/ overhead):{' '}
+								<b className="font-mono">
+									{totalNodeSize != null ? `${(totalNodeSize / 1024 / 1024).toFixed(2)} MB` : '...'}
+								</b>
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -280,7 +305,7 @@ const PerfPage = observer(() => {
 					<div className="p-4 bg-blue-50 rounded">
 						<h3 className="text-lg font-semibold mb-2">PowerSync useQuery Results</h3>
 						<div className="text-sm text-gray-500">
-							Waiting for raw performance tests to complete...
+							Waiting for wrapped database performance tests to complete...
 						</div>
 					</div>
 				)}

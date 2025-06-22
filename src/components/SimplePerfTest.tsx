@@ -104,10 +104,10 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>
 
 	return (
 		<div className="p-6 bg-yellow-50 border border-yellow-200 rounded-lg">
-			<h2 className="text-xl font-bold mb-4">Raw Database Performance</h2>
+			<h2 className="text-xl font-bold mb-4">Wrapped Database Performance</h2>
 			<p className="text-sm text-gray-600 mb-4">
 				Auto-runs when the database is ready. <br />
-				You can <b>re-run</b> them <b>manually</b> to <b>control for cold start.</b>
+				You can <b>re-run</b> the tests <b>manually</b> to <b>control for cold start.</b> Cold start is intentionally not instant on auto-run to test for interference of queries above.
 			</p>
 			<button
 				onClick={runTests}
@@ -118,7 +118,7 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>
 						: 'bg-red-600 text-white hover:bg-red-700'
 				}`}
 			>
-				{isRunning ? 'Running...' : 'Run Raw Performance Tests'}
+				{isRunning ? 'Running...' : 'Re-Run Wrapped Database Performance Tests (recommended)'}
 			</button>
 
 			{isRunning && (
