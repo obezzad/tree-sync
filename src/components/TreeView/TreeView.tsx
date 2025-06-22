@@ -21,33 +21,17 @@ interface TreeViewProps {
   nodes: Node[];
   nodeService: NodeService;
   readOnly?: boolean;
-  loadChildren?: (parentId: string) => Promise<void>;
+  expandedNodes: Set<string>;
+  onToggleExpand: (nodeId: string) => void;
 }
 
 const ROW_HEIGHT = 48; // 40px height + 8px margin
 
 const MemoizedTreeNode = memo(TreeNode);
 
-export const TreeView = observer(({ nodes, nodeService, readOnly = false, loadChildren }: TreeViewProps) => {
+export const TreeView = observer(({ nodes, nodeService, readOnly = false, expandedNodes, onToggleExpand }: TreeViewProps) => {
   const [isBulkAddModalOpen, setIsBulkAddModalOpen] = useState(false);
   const [selectedNodeForBulk, setSelectedNodeForBulk] = useState<string | null>(null);
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
-
-  const handleToggleExpand = useCallback(
-    (nodeId: string) => {
-      setExpandedNodes((prev) => {
-        const next = new Set(prev);
-        if (next.has(nodeId)) {
-          next.delete(nodeId);
-        } else {
-          next.add(nodeId);
-          loadChildren?.(nodeId);
-        }
-        return next;
-      });
-    },
-    [loadChildren]
-  );
 
   const nodeMap = useMemo(() => {
     const map = new Map<string, Node>();
@@ -117,11 +101,11 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false, loadCh
         listRef.current.scrollToRow(selectedIndex);
         const selectedNode = flattenedNodes[selectedIndex];
         if (selectedNode && !expandedNodes.has(selectedNode.node.id)) {
-          handleToggleExpand(selectedNode.node.id);
+          onToggleExpand(selectedNode.node.id);
         }
       }
     }
-  }, [rootStore.selectedNodeId, flattenedNodes, expandedNodes, handleToggleExpand]);
+  }, [rootStore.selectedNodeId, flattenedNodes, expandedNodes, onToggleExpand]);
 
   const isNodeAncestorOf = useCallback((potentialAncestorId: string, nodeId: string): boolean => {
     let currentNode = nodeMap.get(nodeId);
@@ -251,8 +235,8 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false, loadCh
                           onMove={handleMove}
                           onBulkAdd={handleBulkAdd}
                           readOnly={readOnly}
-                          isExpanded={!!expandedNodesMap.get(node.id)}
-                          onToggleExpand={handleToggleExpand}
+                          isExpanded={expandedNodes.has(node.id)}
+                          onToggleExpand={onToggleExpand}
                         />
                       </div>
                     );

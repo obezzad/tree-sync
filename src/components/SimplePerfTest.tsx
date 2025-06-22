@@ -112,8 +112,10 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>
 		setRunningTests(prev => new Set(prev).add(key));
 		const local_id = store.session?.user?.user_metadata?.local_id;
 		const rootNodeId = uuidv5('ROOT_NODE', userService.getUserId());
-		const sampleNode: any | undefined = await db.get('SELECT id FROM nodes LIMIT 1');
-		const sampleNodeId = sampleNode?.id;
+
+		const sampleNodesResult = await db.execute(queries.getSampleNodes.sql, [local_id]);
+		const sampleNodeIds = (sampleNodesResult.rows?._array || []).map((r: any) => r.id);
+		const sampleNodeId = sampleNodeIds[0];
 
 		const resolveParams = (params: QueryParam[]): any[] => {
 			return params.map(p => {
@@ -134,6 +136,8 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>
 						return JSON.stringify({ content: `New node ${new Date().toISOString()}` });
 					case 'isRecursive':
 						return false;
+					case 'expandedNodesJson':
+						return JSON.stringify(sampleNodeIds);
 					default:
 						return null;
 				}

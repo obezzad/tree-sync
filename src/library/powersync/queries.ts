@@ -6,7 +6,8 @@ export type QueryParam =
 	| 'newNodeId'
 	| 'payload'
 	| 'parentId'
-	| 'isRecursive';
+	| 'isRecursive'
+	| 'expandedNodesJson';
 
 export interface QueryDefinition {
 	sql: string;
@@ -53,6 +54,15 @@ export const queries: { [key: string]: QueryDefinition } = {
 		title: 'Get Root Nodes',
 		sql: 'SELECT *, EXISTS(SELECT 1 FROM nodes AS c WHERE c.parent_id = p.id) as has_children FROM nodes AS p WHERE p.parent_id IS NULL',
 		params: []
+	},
+	getVisibleNodes: {
+		title: 'Get Visible Nodes (lazy loading the tree)',
+		sql: `
+		SELECT *, EXISTS(SELECT 1 FROM nodes AS c WHERE c.parent_id = p.id) as has_children
+		FROM nodes AS p
+		WHERE p.parent_id IS NULL OR p.parent_id IN (SELECT value FROM json_each(?))
+		`,
+		params: ['expandedNodesJson']
 	},
 	countAllNodes: {
 		title: 'Count All Nodes',
