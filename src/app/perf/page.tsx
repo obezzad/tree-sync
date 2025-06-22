@@ -196,6 +196,24 @@ const PerfPage = observer(() => {
 				</p>
 			</div>
 
+			<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+				<h2 className="text-lg font-bold mb-2">Performance Analysis Guide</h2>
+				<div className="space-y-3 text-sm">
+					<div>
+						<strong>If PowerSync useQuery is slow but raw database is fast:</strong>
+						<p className="text-gray-700">Problem is in PowerSync's reactive layer, React re-rendering, or change detection overhead.</p>
+					</div>
+					<div>
+						<strong>If both PowerSync and raw database are slow:</strong>
+						<p className="text-gray-700">Problem is at the database level - check indexes, query optimization, or SQLite configuration.</p>
+					</div>
+					<div>
+						<strong>If both are fast:</strong>
+						<p className="text-gray-700">Problem was in the application layer (tree rendering, complex UI operations, etc.).</p>
+					</div>
+				</div>
+			</div>
+
 			<div className="bg-white rounded-lg shadow-lg p-6">
 				<h2 className="text-2xl font-bold mb-6">System Status</h2>
 
@@ -213,17 +231,6 @@ const PerfPage = observer(() => {
 						</div>
 					</div>
 				</div>
-
-				{rawTestsCompleted && local_id ? (
-					<UseQueryBenchmarks local_id={local_id} />
-				) : (
-					<div className="mb-6 p-4 bg-blue-50 rounded">
-						<h3 className="text-lg font-semibold mb-2">PowerSync useQuery Results</h3>
-						<div className="text-sm text-gray-500">
-							Waiting for raw performance tests to complete...
-						</div>
-					</div>
-				)}
 			</div>
 
 			<SimplePerfTest
@@ -235,22 +242,17 @@ const PerfPage = observer(() => {
 				onTestsComplete={handleTestsComplete}
 			/>
 
-			<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-				<h2 className="text-lg font-bold mb-2">Performance Analysis Guide</h2>
-				<div className="space-y-3 text-sm">
-					<div>
-						<strong>If PowerSync useQuery is slow but raw database is fast:</strong>
-						<p className="text-gray-700">Problem is in PowerSync's reactive layer, React re-rendering, or change detection overhead.</p>
+			<div className="bg-white rounded-lg shadow-lg p-6">
+				{rawTestsCompleted && local_id ? (
+					<UseQueryBenchmarks local_id={local_id} />
+				) : (
+					<div className="p-4 bg-blue-50 rounded">
+						<h3 className="text-lg font-semibold mb-2">PowerSync useQuery Results</h3>
+						<div className="text-sm text-gray-500">
+							Waiting for raw performance tests to complete...
+						</div>
 					</div>
-					<div>
-						<strong>If both PowerSync and raw database are slow:</strong>
-						<p className="text-gray-700">Problem is at the database level - check indexes, query optimization, or SQLite configuration.</p>
-					</div>
-					<div>
-						<strong>If both are fast:</strong>
-						<p className="text-gray-700">Problem was in the application layer (tree rendering, complex UI operations, etc.).</p>
-					</div>
-				</div>
+				)}
 			</div>
 		</main>
 	);
