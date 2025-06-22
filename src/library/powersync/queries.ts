@@ -27,6 +27,11 @@ const getDescendantsOfNodeQuery = `
 `;
 
 export const queries: { [key: string]: QueryDefinition } = {
+	coldStartProbe: {
+		title: 'Cold Start Probe',
+		sql: 'SELECT 1 as probe',
+		params: []
+	},
 	getAllNodeIds: {
 		title: 'List All Node IDs',
 		sql: 'SELECT id FROM nodes',

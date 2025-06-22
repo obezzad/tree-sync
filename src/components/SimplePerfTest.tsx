@@ -37,18 +37,6 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>
 
 		onTestsStart();
 
-		// Hardcoded cold start test
-		const coldStartRuns: number[] = [];
-		for (let i = 0; i < 3; i++) {
-			const start = performance.now();
-			await db.execute('SELECT 1 as probe');
-			const duration = performance.now() - start;
-			coldStartRuns.push(duration);
-			await new Promise(resolve => setTimeout(resolve, 50)); // Small delay between runs
-		}
-		const coldStartAverage = coldStartRuns.reduce((a, b) => a + b, 0) / coldStartRuns.length;
-		onNewResult({ name: 'Cold Start Probe (SELECT 1)', runs: coldStartRuns, average: coldStartAverage });
-
 		const local_id = store.session?.user?.user_metadata?.local_id;
 		const rootNodeId = uuidv5('ROOT_NODE', userService.getUserId());
 		const sampleNode: any | undefined = await db.get('SELECT id FROM nodes LIMIT 1');
