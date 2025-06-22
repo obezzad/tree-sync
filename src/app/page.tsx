@@ -10,8 +10,7 @@ import store from '@/stores/RootStore';
 import { observer } from 'mobx-react-lite';
 import { v5 as uuidv5 } from 'uuid';
 import { userService } from '@/library/powersync/userService';
-import { measureOnce, METRICS, registerLastSync, registerStart, timestamp } from '@/utils/metrics';
-import { usePrevious } from '@/hooks/usePrevious';
+import { measureOnce, METRICS, registerLastSync, registerStart } from '@/utils/metrics';
 
 const Home = observer(() => {
   const db = usePowerSync();
@@ -24,7 +23,6 @@ const Home = observer(() => {
   const { data: allNodes } = useQuery('SELECT count(id) as count FROM nodes');
   const { data: userNodes } = useQuery('SELECT count(id) as count FROM nodes WHERE user_id = ?', [local_id]);
   const { data: remoteNodes } = useQuery('SELECT count(id) as count FROM nodes WHERE user_id = ? AND _is_pending IS NULL', [local_id]);
-  const prevCount = usePrevious(remoteNodes?.[0]?.count);
   const { data: nodes } = useQuery(`
     WITH parent AS (
       SELECT id, parent_id
@@ -74,17 +72,6 @@ const Home = observer(() => {
   const { data: pendingUpload } = useQuery('select count(distinct tx_id) as count from ps_crud');
   const { downloadProgress, dataFlowStatus, connected, hasSynced } = useStatus();
 
-  console.debug('Query results:', {
-    allNodes: allNodes?.[0]?.count,
-    userNodes: userNodes?.[0]?.count,
-    remoteNodes: remoteNodes?.[0]?.count,
-    nodesLength: nodes?.length,
-    selectedNodeId: store.selectedNodeId,
-    local_id
-  });
-
-  const [remoteCount, setRemoteCount] = useState<number | null>(null);
-
   useEffect(() => {
     registerStart();
   }, []);
@@ -106,6 +93,15 @@ const Home = observer(() => {
   return (
     <main className="flex h-[calc(100vh-theme(spacing.16))]">
       <aside className="hidden sm:flex sm:w-72 py-1 px-2 border-r flex-col gap-0.5 text-xs">
+        <div className="mb-2 pb-2 border-b border-gray-200">
+          <a
+            href="/perf"
+            className="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition-colors"
+          >
+            🔍 Performance Testing
+          </a>
+        </div>
+
         <div className="text-gray-600 leading-tight">User's buckets: <b className="text-black">{buckets[0]?.bucket_count ?? 0}</b></div>
         <div className="text-gray-600 leading-tight">User nodes: <b className="text-black">{userNodes[0]?.count ?? 0}</b></div>
         <div className="text-gray-600 leading-tight">Selected ID: <b className="text-black truncate block">{store.selectedNodeId}</b></div>

@@ -23,11 +23,10 @@ export class MutationStore {
     console.debug(`[MutationStore] waiting for writeTransaction lock for ${config.name}`);
     let affectedNodeIds: string[] = [];
 
-    // Use no wait for move_node to avoid long lock waits
     const writeTx = async (tx: Transaction) => {
       console.debug(`[MutationStore] writeTransaction callback START ${config.name}`);
       affectedNodeIds = await config.optimisticUpdate(tx);
-      console.debug(`[MutationStore] optimisticUpdate done ${config.name}`, affectedNodeIds);
+      console.debug(`[MutationStore] optimisticUpdate done for ${config.name}`, affectedNodeIds);
 
       if (affectedNodeIds.length > 0) {
         console.debug(`[MutationStore] executing _is_pending update for ${config.name}`, affectedNodeIds);
@@ -50,6 +49,7 @@ export class MutationStore {
       console.debug(`[MutationStore] writeTransaction callback END ${config.name}`);
     };
 
+    // HACK: Use no wait for move_node to avoid long lock waits
     const lockTimeout = config.name === 'move_node' ? 0 : undefined;
     if (lockTimeout === 0) {
       await this.db.writeTransaction(writeTx, 0);
