@@ -28,7 +28,7 @@ const getDescendantsOfNodeQuery = `
 
 export const queries: { [key: string]: QueryDefinition } = {
 	coldStartProbe: {
-		title: 'Cold Start Probe',
+		title: 'Cold Start Sanity Check (SELECT 1, should be instant)',
 		sql: 'SELECT 1 as probe',
 		params: []
 	},
@@ -49,17 +49,12 @@ export const queries: { [key: string]: QueryDefinition } = {
 	},
 	countAllNodes: {
 		title: 'Count All Nodes',
-		sql: 'SELECT count(id) as count FROM nodes',
+		sql: 'SELECT count(*) as count FROM nodes',
 		params: []
 	},
 	countUserNodes: {
 		title: 'Count User Nodes',
-		sql: 'SELECT count(id) as count FROM nodes WHERE user_id = ?',
-		params: ['userId']
-	},
-	countRemoteNodes: {
-		title: 'Count Synced Nodes',
-		sql: 'SELECT count(id) as count FROM nodes WHERE user_id = ? AND _is_pending IS NULL',
+		sql: 'SELECT count(*) as count FROM nodes WHERE user_id = ?',
 		params: ['userId']
 	},
 	getSampleNodes: {
@@ -113,7 +108,7 @@ export const queries: { [key: string]: QueryDefinition } = {
         SELECT ? AS id WHERE ? IS NOT NULL
     )
     SELECT * FROM nodes
-    WHERE user_id = ?`,
+    WHERE id IN (SELECT id FROM focused_nodes) AND user_id = ?`,
 		params: [
 			'focusedNodeId',
 			'focusedNodeId',

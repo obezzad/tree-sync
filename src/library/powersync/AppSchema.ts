@@ -15,11 +15,11 @@ const nodes = new Table(
     indexes: {
       user_id_idx: ['user_id'],
       parent_id_idx: ['parent_id'],
-      user_parent_idx: ['user_id', 'parent_id'],
-      user_archived_idx: ['user_id', 'archived_at'],
-      user_created_idx: ['user_id', 'created_at'],
-      user_parent_created_idx: ['user_id', 'parent_id', 'created_at'],
-      user_pending_idx: ['user_id', '_is_pending'],
+      user_id_id_idx: ['user_id', 'id'],
+      parent_id_id_idx: ['parent_id', 'id'],
+      user_id__is_pending_idx: ['user_id', '_is_pending'],
+      parent_id_archived_at_idx: ['parent_id', 'archived_at'],
+      archived_at_idx: ['archived_at']
     }
   }
 );
