@@ -130,49 +130,64 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false, expand
     return false;
   }, [nodeMap]);
 
-  const handleMove = useCallback(async (sourceId: string, targetId: string, position: 'before' | 'after' | 'inside') => {
-    console.debug('👉 handleMove(', sourceId, ',', targetId, ',', position, ')');
-    if (readOnly) return;
+  const handleMove = useCallback(
+    async (draggedNodeId: string, dropTargetNodeId: string | null) => {
+      console.debug('👉 handleMove(', draggedNodeId, ',', dropTargetNodeId, ')');
+      if (readOnly) return;
 
-    const sourceNode = nodeMap.get(sourceId);
-    const targetNode = nodeMap.get(targetId);
+      const sourceNode = nodeMap.get(draggedNodeId);
+      const targetNode = dropTargetNodeId ? nodeMap.get(dropTargetNodeId) : null;
 
-    if (!sourceNode || !targetNode) {
-      toast.error('Unable to move node: Node not found');
-      return;
-    }
-
-    if (sourceId === targetId || isNodeAncestorOf(sourceId, targetId)) {
-      toast.error('Cannot move a node into its own subtree');
-      return;
-    }
-
-    try {
-      console.debug('   calling nodeService.moveNode…');
-      if (position !== 'inside') {
-        throw new Error('Siblings reordering is not supported yet');
+      if (!sourceNode || (dropTargetNodeId && !targetNode)) {
+        toast.error('Unable to move node: Node not found');
+        return;
       }
 
-      await nodeService.moveNode(sourceId, targetId);
-      console.debug('   moveNode resolved');
+      if (draggedNodeId === dropTargetNodeId || isNodeAncestorOf(draggedNodeId, dropTargetNodeId || '')) {
+        toast.error('Cannot move a node into its own subtree');
+        return;
+      }
 
-      toast.success('Node moved successfully');
-    } catch (error: any) {
-      console.error('Failed to move node:', error);
-      toast.error(error.message ?? 'Failed to move node');
-    }
-  }, [readOnly, nodeMap, nodeService, isNodeAncestorOf]);
+      try {
+        console.debug('   calling nodeService.moveNode…');
+        if (!dropTargetNodeId) {
+          throw new Error('Siblings reordering is not supported yet');
+        }
 
-  const handleAddNode = useCallback(async (parentId: string | null) => {
-    if (readOnly) return;
+        await nodeService.moveNode(draggedNodeId, dropTargetNodeId);
+        console.debug('   moveNode resolved');
+        if (dropTargetNodeId && !expandedNodes.has(dropTargetNodeId)) {
+          onToggleExpand(dropTargetNodeId);
+        }
+        toast.success('Node moved successfully');
+      } catch (error: any) {
+        console.error('Failed to move node:', error);
+        toast.error(error.message ?? 'Failed to move node');
+      }
+    },
+    [readOnly, nodeMap, nodeService, isNodeAncestorOf, onToggleExpand, expandedNodes]
+  );
 
-    const node = {
-      parent_id: parentId,
-      payload: JSON.stringify({ name: treeUtils.generateReadableName() })
-    };
+  const handleAddNode = useCallback(
+    async (parentId: string | null) => {
+      if (readOnly) return;
 
-    await nodeService.createNode(node);
-  }, [readOnly, nodeService]);
+      try {
+        await nodeService.createNode({
+          parent_id: parentId,
+          payload: JSON.stringify({ name: treeUtils.generateReadableName() })
+        });
+        if (parentId && !expandedNodes.has(parentId)) {
+          onToggleExpand(parentId);
+        }
+        toast.success('Node added successfully');
+      } catch (error: any) {
+        console.error('Failed to add node:', error);
+        toast.error(error.message ?? 'Failed to add node');
+      }
+    },
+    [readOnly, nodeService, onToggleExpand, expandedNodes]
+  );
 
   const handleBulkAdd = useCallback((nodeId: string) => {
     setSelectedNodeForBulk(nodeId);

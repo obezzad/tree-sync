@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { TreeView } from '@/components/TreeView/TreeView';
 import { Node, NodeService } from '@/library/powersync/NodeService';
 import { usePowerSync, useQuery } from '@powersync/react';
@@ -15,6 +15,7 @@ import { queries } from '@/library/powersync/queries';
 
 const Home = observer(() => {
   const db = usePowerSync();
+  const prevSelectedNodeIdRef = useRef<string | null>(null);
 
   if (!db) throw new Error('PowerSync context not found');
 
@@ -40,10 +41,23 @@ const Home = observer(() => {
         next.delete(nodeId);
       } else {
         next.add(nodeId);
+        store.setSelectedNodeId(nodeId);
       }
       return next;
     });
   }, []);
+
+  useEffect(() => {
+    if (store.selectedNodeId && store.selectedNodeId !== prevSelectedNodeIdRef.current) {
+      if (!expandedNodes.has(store.selectedNodeId)) {
+        const node = loadedNodes.find((n) => n.id === store.selectedNodeId);
+        if (node && node.has_children) {
+          setExpandedNodes((prev) => new Set(prev).add(node.id!));
+        }
+      }
+    }
+    prevSelectedNodeIdRef.current = store.selectedNodeId;
+  }, [store.selectedNodeId, expandedNodes, loadedNodes]);
 
   useEffect(() => {
     registerStart();
