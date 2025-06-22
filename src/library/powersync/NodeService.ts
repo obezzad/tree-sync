@@ -5,6 +5,7 @@ import { userService } from '@/library/powersync/userService';
 import { MutationStore } from '@/stores/MutationStore';
 import store from '@/stores/RootStore';
 import { makeAutoObservable, runInAction } from 'mobx';
+import { queries } from './queries';
 
 export type Node = Database['nodes'];
 
@@ -34,9 +35,7 @@ export class NodeService {
       args: { ...data, id: node_id },
       optimisticUpdate: async (tx: Transaction) => {
         const insertResult = await tx.execute(
-          `INSERT INTO nodes (id, created_at, payload, user_id, parent_id, _is_pending)
-           VALUES (?, current_timestamp, ?, ?, ?, 1)
-           RETURNING id`,
+          queries.insertNode,
           [node_id, data.payload ?? '{}', user_id, data.parent_id]
         );
 
@@ -58,7 +57,7 @@ export class NodeService {
       optimisticUpdate: async (tx: Transaction) => {
         // HACK: Simple and efficient optimistic parent update without recursion
         const updateResult = await tx.execute(
-          `UPDATE nodes SET parent_id = ? WHERE id = ? RETURNING id`,
+          queries.moveNode,
           [newParentId, nodeId]
         );
         return updateResult.rows?._array.map(row => row.id) ?? [];
@@ -77,15 +76,7 @@ export class NodeService {
       args: { node_id },
       optimisticUpdate: async (tx: Transaction) => {
         // HACK: Archive only the parent node
-        const updateResult = await tx.execute(`
-          UPDATE nodes
-          SET archived_at = CURRENT_TIMESTAMP
-          WHERE CASE
-              WHEN ? THEN parent_id = ?
-              ELSE id = ?
-          END
-          AND archived_at IS NULL
-          RETURNING id;`, [isRoot, node_id, node_id]);
+        const updateResult = await tx.execute(queries.archiveNode, [isRoot, node_id, node_id]);
 
         return updateResult.rows?._array.map(row => row.id) ?? [];
       }

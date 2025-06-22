@@ -60,6 +60,10 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
   }, [nodes]);
 
   const treeData = useMemo(() => {
+    if (!nodes || nodes.length === 0) {
+      return [];
+    }
+
     const nodeMap = new Map<string | null, Node[]>();
 
     nodes.forEach(node => {
@@ -107,11 +111,11 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
 
   const flattenedNodes = useMemo(() => {
     const flattened: Array<{ node: TreeNodeData; level: number }> = [];
-    const flatten = (nodes: TreeNodeData[], level: number) => {
-      nodes.forEach(node => {
-        flattened.push({ node, level });
-        if (!collapsedNodesMap.get(node.id) && node.children.length > 0) {
-          flatten(node.children, level + 1);
+    const flatten = (tree: TreeNodeData[], level: number) => {
+      tree.forEach(treeNode => {
+        flattened.push({ node: treeNode, level });
+        if (!collapsedNodesMap.has(treeNode.id) && treeNode.children.length > 0) {
+          flatten(treeNode.children, level + 1);
         }
       });
     };
@@ -144,7 +148,7 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
   }, [nodeMap]);
 
   const handleMove = useCallback(async (sourceId: string, targetId: string, position: 'before' | 'after' | 'inside') => {
-    console.log('👉 handleMove(', sourceId, ',', targetId, ',', position, ')');
+    console.debug('👉 handleMove(', sourceId, ',', targetId, ',', position, ')');
     if (readOnly) return;
 
     const sourceNode = nodeMap.get(sourceId);

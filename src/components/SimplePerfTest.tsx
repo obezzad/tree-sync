@@ -1,8 +1,12 @@
 'use client';
 
-import { useState, forwardRef, useImperativeHandle } from 'react';
+import { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
 import { usePowerSync } from '@powersync/react';
 import { AbstractPowerSyncDatabase } from '@powersync/web';
+import store from '@/stores/RootStore';
+import { queries } from '@/library/powersync/queries';
+import { v5 as uuidv5 } from 'uuid';
+import { userService } from '@/library/powersync/userService';
 
 interface TestResult {
 	name: string;
@@ -24,11 +28,22 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, {}>((props, ref) => 
 
 		setIsRunning(true);
 		setTestResults([]);
+		const local_id = store.session?.user?.user_metadata?.local_id;
+		const rootNodeId = uuidv5('ROOT_NODE', userService.getUserId());
 
 		const tests = [
 			{ name: 'Cold Start Probe (SELECT 1)', query: 'SELECT 1 as probe', params: [] },
-			{ name: 'Count All Nodes', query: 'SELECT count(*) as count FROM nodes', params: [] },
-			{ name: 'List All Node IDs', query: 'SELECT id FROM nodes', params: [] }
+			{ name: 'List All Node IDs', query: queries.getAllNodeIds, params: [] },
+			{
+				name: 'List All Node IDs for User',
+				query: queries.getAllNodeIdsForUser,
+				params: [local_id]
+			},
+			{
+				name: 'List All Descendant IDs of Root',
+				query: queries.getDescendantsOfNode,
+				params: [rootNodeId]
+			}
 		];
 
 		const allTestResults: TestResult[] = [];
