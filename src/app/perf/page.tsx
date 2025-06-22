@@ -233,24 +233,6 @@ const PerfPage = observer(() => {
 				</p>
 			</div>
 
-			<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-				<h2 className="text-lg font-bold mb-2">Performance Analysis Guide</h2>
-				<div className="space-y-3 text-sm">
-					<div>
-						<strong>If PowerSync useQuery is slow but wrapped database is fast:</strong>
-						<p className="text-gray-700">Problem is in PowerSync's reactive layer, React re-rendering, or change detection overhead.</p>
-					</div>
-					<div>
-						<strong>If both PowerSync and wrapped database are slow:</strong>
-						<p className="text-gray-700">Problem is at the database level - check indexes, query optimization, or SQLite configuration.</p>
-					</div>
-					<div>
-						<strong>If both are fast:</strong>
-						<p className="text-gray-700">Problem was in the application layer (tree rendering, complex UI operations, etc.).</p>
-					</div>
-				</div>
-			</div>
-
 			<div className="bg-white rounded-lg shadow-lg p-6">
 				<h2 className="text-2xl font-bold mb-6">System Status</h2>
 
@@ -309,6 +291,32 @@ const PerfPage = observer(() => {
 						</div>
 					</div>
 				)}
+			</div>
+
+			<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+				<h2 className="text-lg font-bold mb-2">Performance Analysis Guide</h2>
+				<div className="space-y-3 text-sm">
+					<div>
+						<strong>If "PowerSync useQuery Time to First Data" is high, but "Wrapped Database Performance" is good:</strong>
+						<p className="text-gray-700">
+							The overhead is likely in PowerSync's reactive layer or React's rendering
+							cycle.
+						</p>
+					</div>
+					<div>
+						<strong>If both "PowerSync useQuery Time to First Data" and "Wrapped Database Performance" are poor:</strong>
+						<p className="text-gray-700">
+							The bottleneck could be at the database level (inefficient queries,
+							missing indexes) or from overhead in the PowerSync, such as JSON serialization/deserialization between <a href="https://docs.powersync.com/architecture/client-architecture#schema" target="_blank" rel="noopener noreferrer" className='text-blue-600'>ps_data__*</a> and the views.
+						</p>
+					</div>
+					<div>
+						<strong>If both are good:</strong>
+						<p className="text-gray-700">
+							The performance issue is likely in expensive rendering (e.g., large tree rendering without pagination).
+						</p>
+					</div>
+				</div>
 			</div>
 		</main>
 	);
