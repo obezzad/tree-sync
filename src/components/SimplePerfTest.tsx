@@ -7,16 +7,18 @@ import store from '@/stores/RootStore';
 import { queries, QueryDefinition, QueryParam } from '@/library/powersync/queries';
 import { v4 as uuidv4, v5 as uuidv5 } from 'uuid';
 import { userService } from '@/library/powersync/userService';
+import { useState } from 'react';
 
 export interface TestResult {
 	name: string;
 	key: string;
 	runs: number[];
 	average: number;
+	explainPlan?: any[];
 }
 
 export interface SimplePerfTestRef {
-	runTests: () => void;
+	runTests: (explainResults?: Map<string, any[]>) => void;
 }
 
 interface SimplePerfTestProps {
@@ -27,13 +29,66 @@ interface SimplePerfTestProps {
 	onTestsComplete: () => void;
 }
 
+const TestResultItem = ({ result }: { result: TestResult }) => {
+	const [isOpen, setIsOpen] = useState(false);
+	const hasExplainPlan = result.explainPlan && result.explainPlan.length > 0;
+
+	return (
+		<div
+			className={`p-4 rounded border ${
+				result.average > 100
+					? 'bg-red-50 border-red-200'
+					: result.average > 50
+					? 'bg-yellow-50 border-yellow-200'
+					: 'bg-green-50 border-green-200'
+			}`}
+		>
+			<div className="flex justify-between items-start mb-2">
+				<div>
+					<span className="font-medium">{result.name}</span>
+					<div className="text-xs font-mono text-gray-500 mt-1">{result.key}</div>
+				</div>
+				<div
+					className={`text-lg font-bold ${
+						result.average > 100
+							? 'text-red-600'
+							: result.average > 50
+							? 'text-yellow-600'
+							: 'text-green-600'
+					}`}
+				>
+					{result.average > 1 ? `${result.average.toFixed(1)}ms` : `${(result.average * 1000).toFixed(1)}µs`}
+				</div>
+			</div>
+			<div className="text-sm text-gray-600">
+				Runs:{' '}
+				{result.runs
+					.map(r => (r > 1 ? `${r.toFixed(1)}ms` : `${(r * 1000).toFixed(1)}µs`))
+					.join(', ')}
+			</div>
+			{hasExplainPlan && (
+				<div className="mt-2">
+					<button onClick={() => setIsOpen(!isOpen)} className="text-sm text-blue-600 hover:underline">
+						{isOpen ? '▼' : '►'} Show EXPLAIN QUERY PLAN
+					</button>
+					{isOpen && (
+						<pre className="bg-gray-100 p-2 rounded text-xs overflow-auto mt-1">
+							{JSON.stringify(result.explainPlan, null, 2)}
+						</pre>
+					)}
+				</div>
+			)}
+		</div>
+	);
+};
+
 export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>((
 	{ testResults, isRunning, onNewResult, onTestsStart, onTestsComplete },
 	ref
 ) => {
 	const db = usePowerSync() as AbstractPowerSyncDatabase;
 
-	const runTests = async () => {
+	const runTests = async (explainResults?: Map<string, any[]>) => {
 		if (!db || isRunning) return;
 
 		onTestsStart();
@@ -93,7 +148,9 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>
 				}
 			}
 			const average = runs.reduce((a, b) => a + b, 0) / runs.length;
-			onNewResult({ name: test.title, key, runs, average });
+			const explainPlan = explainResults?.get(key);
+
+			onNewResult({ name: test.title, key, runs, average, explainPlan });
 		}
 		onTestsComplete();
 	};
@@ -106,68 +163,17 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>
 		<div className="bg-white rounded-lg shadow-lg p-6">
 			<h2 className="text-xl font-bold mb-4">Wrapped Database Performance</h2>
 			<p className="text-sm text-gray-600 mb-4">
-				Auto-runs when the database is ready. <br />
-				You can <b>re-run</b> the tests <b>manually</b> to <b>control for cold start.</b> Cold start is intentionally not instant on auto-run to test for interference of queries above.
+				Auto-runs when the database is ready.
 			</p>
-			<button
-				onClick={runTests}
-				disabled={isRunning || !db}
-				className={`px-4 py-2 rounded font-medium ${
-					isRunning
-						? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-						: 'bg-red-600 text-white hover:bg-red-700'
-				}`}
-			>
-				{isRunning ? 'Running...' : 'Re-Run Wrapped Database Performance Tests (recommended)'}
-			</button>
 
-			{isRunning && (
+			{isRunning && !testResults.length && (
 				<div className="mt-4 text-blue-600">Running tests...</div>
 			)}
 
 			{testResults.length > 0 && (
 				<div className="space-y-4 mt-4">
 					{testResults.map((result, index) => (
-						<div
-							key={index}
-							className={`p-4 rounded border ${
-								result.average > 100
-									? 'bg-red-50 border-red-200'
-									: result.average > 50
-										? 'bg-yellow-50 border-yellow-200'
-										: 'bg-green-50 border-green-200'
-							}`}
-						>
-							<div className="flex justify-between items-start mb-2">
-								<div>
-									<span className="font-medium">{result.name}</span>
-									<div className="text-xs font-mono text-gray-500 mt-1">{result.key}</div>
-								</div>
-								<div
-									className={`text-lg font-bold ${
-										result.average > 100
-											? 'text-red-600'
-											: result.average > 50
-												? 'text-yellow-600'
-												: 'text-green-600'
-									}`}
-								>
-									{result.average > 1
-										? `${result.average.toFixed(1)}ms`
-										: `${(result.average * 1000).toFixed(1)}µs`}
-								</div>
-							</div>
-							<div className="text-sm text-gray-600">
-								Runs:{' '}
-								{result.runs
-									.map(r =>
-										r > 1
-											? `${r.toFixed(1)}ms`
-											: `${(r * 1000).toFixed(1)}µs`
-									)
-									.join(', ')}
-							</div>
-						</div>
+						<TestResultItem key={index} result={result} />
 					))}
 				</div>
 			)}

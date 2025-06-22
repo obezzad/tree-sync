@@ -197,14 +197,33 @@ const PerfPage = observer(() => {
 
 			await db.waitForReady();
 			setTimeToReady(performance.now() - mountTime);
-			perfTestRef.current?.runTests();
+
+			// Run EXPLAIN QUERY PLAN for all non-mutation queries
+			if (local_id) {
+				const explainResults = new Map<string, any[]>();
+				const benchmarkQueries = Object.fromEntries(Object.entries(queries).filter(([, q]) => !q.isMutation));
+
+				for (const [key, query] of Object.entries(benchmarkQueries)) {
+					const params = query.params.includes('userId') ? [local_id] : [];
+					try {
+						const plan = await db.execute(`EXPLAIN QUERY PLAN ${query.sql}`, params);
+						explainResults.set(key, plan.rows?._array || []);
+					} catch (e: any) {
+						console.error(`Error explaining ${key}:`, e);
+						explainResults.set(key, [{ error: e.message }]);
+					}
+				}
+				perfTestRef.current?.runTests(explainResults);
+			} else {
+				perfTestRef.current?.runTests();
+			}
 
 			await db.waitForFirstSync();
 			setTimeToFirstSync(performance.now() - mountTime);
 		};
 
 		measurePromises();
-	}, [db]);
+	}, [db, local_id]);
 
 	useEffect(() => {
 		if (mountTimeRef.current === null) return;
