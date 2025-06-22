@@ -31,25 +31,6 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
   const [isBulkAddModalOpen, setIsBulkAddModalOpen] = useState(false);
   const [selectedNodeForBulk, setSelectedNodeForBulk] = useState<string | null>(null);
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
-  const collapsedRootIdsRef = useRef(new Set<string>());
-
-  useEffect(() => {
-    const rootNodes = nodes.filter(node => node.parent_id === null);
-    const newRootIds = rootNodes.map(node => node.id);
-
-    const newRootsToCollapse = newRootIds.filter(id => !collapsedRootIdsRef.current.has(id));
-
-    if (newRootsToCollapse.length > 0) {
-      setCollapsedNodes(prev => {
-        const next = new Set(prev);
-        newRootsToCollapse.forEach(id => {
-          next.add(id);
-          collapsedRootIdsRef.current.add(id);
-        });
-        return next;
-      });
-    }
-  }, [nodes]);
 
   const nodeMap = useMemo(() => {
     const map = new Map<string, Node>();
@@ -83,23 +64,18 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
       }));
     };
 
-    const selectedNode = nodes.find(node => node.id === rootStore.selectedNodeId);
-
-    if (!rootStore.isFocusedView || !selectedNode) {
-      return buildTree(null);
+    if (rootStore.isFocusedView) {
+      const selectedNode = nodes.find(node => node.id === rootStore.selectedNodeId);
+      if (selectedNode) {
+        return [{
+          ...selectedNode,
+          children: buildTree(selectedNode.id)
+        }];
+      }
     }
 
-    const parent = selectedNode.parent_id ? nodes.find(node => node.id === selectedNode.parent_id) : null;
-
-    if (!parent) {
-      return buildTree(null);
-    }
-
-    return [{
-      ...parent,
-      children: buildTree(parent.id)
-    }];
-  }, [nodes]);
+    return buildTree(null);
+  }, [nodes, rootStore.isFocusedView, rootStore.selectedNodeId]);
 
   const collapsedNodesMap = useMemo(() => {
     const map = new Map<string, boolean>();
@@ -110,18 +86,22 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
   }, [nodes, collapsedNodes]);
 
   const flattenedNodes = useMemo(() => {
+    if (rootStore.isFocusedView && treeData.length === 1) {
+      return [{ node: treeData[0], level: 0 }];
+    }
+
     const flattened: Array<{ node: TreeNodeData; level: number }> = [];
     const flatten = (tree: TreeNodeData[], level: number) => {
       tree.forEach(treeNode => {
         flattened.push({ node: treeNode, level });
-        if (!collapsedNodesMap.has(treeNode.id) && treeNode.children.length > 0) {
+        if (!collapsedNodesMap.get(treeNode.id) && treeNode.children.length > 0) {
           flatten(treeNode.children, level + 1);
         }
       });
     };
-    flatten(treeData, 1);
+    flatten(treeData, 0);
     return flattened;
-  }, [treeData, collapsedNodesMap]);
+  }, [treeData, collapsedNodesMap, rootStore.isFocusedView]);
 
   const listRef = useRef<List>(null);
 
@@ -172,15 +152,6 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
 
       await nodeService.moveNode(sourceId, targetId);
       console.debug('   moveNode resolved');
-
-      if (targetId === null && !collapsedRootIdsRef.current.has(sourceId)) {
-        setCollapsedNodes(prev => {
-          const next = new Set(prev);
-          next.add(sourceId);
-          collapsedRootIdsRef.current.add(sourceId);
-          return next;
-        });
-      }
 
       toast.success('Node moved successfully');
     } catch (error: any) {

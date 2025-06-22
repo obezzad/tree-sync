@@ -72,6 +72,16 @@ export const queries: { [key: string]: QueryDefinition } = {
 		sql: `SELECT count(DISTINCT bucket) as bucket_count FROM ps_oplog`,
 		params: []
 	},
+	getAllNodes: {
+		title: 'Get All Nodes',
+		sql: 'SELECT * FROM nodes',
+		params: []
+	},
+	getAllNodesForUser: {
+		title: 'Get All Nodes for a User',
+		sql: 'SELECT * FROM nodes WHERE user_id = ?',
+		params: ['userId']
+	},
 	getSubtree: {
 		title: 'Query Subtree from Root',
 		sql: `
