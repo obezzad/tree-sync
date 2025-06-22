@@ -28,22 +28,6 @@ export const queries: { [key: string]: QueryDefinition } = {
 		sql: 'SELECT id, created_at, user_id FROM nodes WHERE user_id = ? LIMIT 100',
 		params: ['userId']
 	},
-	getTotalNodeSizeForUser: {
-		title: '⚗️ Get Total Node Size for User (used only for benchmarks)',
-		sql: `SELECT
-        SUM(
-            IFNULL(LENGTH(id), 0) +
-            IFNULL(LENGTH(created_at), 0) +
-            IFNULL(LENGTH(payload), 0) +
-            IFNULL(LENGTH(user_id), 0) +
-            IFNULL(LENGTH(parent_id), 0) +
-            IFNULL(LENGTH(rank), 0) +
-            IFNULL(LENGTH(archived_at), 0)
-        ) as total_size
-        FROM nodes
-        WHERE user_id = ?`,
-		params: ['userId']
-	},
 	// Queries for the main app
 	getNodesByParentId: {
 		title: 'Get Nodes by Parent ID',

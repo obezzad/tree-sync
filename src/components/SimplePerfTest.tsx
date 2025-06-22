@@ -209,10 +209,6 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>
 					<p className="text-sm text-gray-600 mb-2">
 						Auto-runs when the database is ready.
 					</p>
-					<p className="text-sm text-gray-600">
-						You can <b>re-run</b> the tests <b>manually</b> to <b>control for cold start.</b> <br />
-						Cold start is <b>intentionally</b> not instant on auto-run to test for interference of queries above.
-					</p>
 				</div>
 				<button
 					onClick={runTests}

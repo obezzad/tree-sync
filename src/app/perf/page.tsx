@@ -170,12 +170,6 @@ const PerfPage = observer(() => {
 	const { data: nodeCountData } = useQuery(queries.countUserNodes.sql, local_id ? [local_id] : []);
 	const syncedNodes = nodeCountData?.[0]?.count;
 
-	const { data: totalNodeSizeData } = useQuery(
-		queries.getTotalNodeSizeForUser.sql,
-		local_id ? [local_id] : []
-	);
-	const totalNodeSize = totalNodeSizeData?.[0]?.total_size;
-
 	const handleTestsStart = () => {
 		setPerfTestResults([]);
 		setIsPerfTestRunning(true);
@@ -265,23 +259,7 @@ const PerfPage = observer(() => {
 							<div>Time to Connect: <b className="font-mono">{timeToConnected !== null ? `${(timeToConnected / 1000).toFixed(2)}s` : '...'}</b></div>
 						</div>
 						<div className="pt-2">
-							<div className="pt-2 p-3 mb-2 bg-orange-50 border border-orange-200 rounded text-xs">
-								<strong>⚠️ Query Interference:</strong>
-								<p className="mt-1 text-gray-700">
-									All queries run sequentially, leading to slow queries being a considerable bottleneck. <br />
-									This is especially problematic for reactive queries like the two directly below this notice as they re-run on every change. <br />
-								</p>
-								<p className="mt-1 text-gray-700">
-									We're intentionally surfacing this interference on <b>Wrapped Database Performance</b> first (auto-)run to test for this issue and possible solutions.
-								</p>
-							</div>
 							<div>Synced Nodes: <b className="font-mono">{syncedNodes ?? '...'}</b></div>
-							<div>
-								Nodes Data Size (wo/ overhead):{' '}
-								<b className="font-mono">
-									{totalNodeSize != null ? `${(totalNodeSize / 1024 / 1024).toFixed(2)} MB` : '...'}
-								</b>
-							</div>
 						</div>
 					</div>
 				</div>
