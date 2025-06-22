@@ -30,14 +30,16 @@ const SingleQueryBenchmark = ({
 	params,
 	isReady,
 	onTimingComplete,
-	initialTiming
+	initialTiming,
+	rawPerfTime
 }: {
 	queryKey: string;
-	query: { title: string; sql: string },
-	params: any[],
-	isReady: (data: any) => boolean,
-	onTimingComplete: (key: string, time: number) => void,
-	initialTiming: number | null
+	query: { title: string; sql: string };
+	params: any[];
+	isReady: (data: any) => boolean;
+	onTimingComplete: (key: string, time: number) => void;
+	initialTiming: number | null;
+	rawPerfTime?: number | null;
 }) => {
 	const startTime = useRef(performance.now());
 	const { data } = useQuery(query.sql, params);
@@ -49,71 +51,99 @@ const SingleQueryBenchmark = ({
 		}
 	}, [data, isReady, onTimingComplete, queryKey, initialTiming]);
 
+	const useQueryTimeMs = initialTiming;
+	const rawTimeMs = rawPerfTime;
+	const overheadMs = useQueryTimeMs != null && rawTimeMs != null ? useQueryTimeMs - rawTimeMs : null;
+
+	const overheadColor =
+		overheadMs == null ? '' : overheadMs > 50 ? 'text-red-600' : overheadMs > 20 ? 'text-yellow-600' : 'text-gray-500';
+
 	return (
 		<div className="flex justify-between items-center">
 			<div>
 				<div className="font-medium">{query.title}</div>
 				<div className="text-xs text-gray-500 font-mono">{queryKey}</div>
 			</div>
-			<span className="font-bold font-mono">
-				{initialTiming != null ? `${(initialTiming / 1000).toFixed(2)}s` : 'Waiting for data...'}
-			</span>
+			<div className="font-mono text-right">
+				<span className="font-bold">
+					{useQueryTimeMs != null ? `${useQueryTimeMs.toFixed(1)}ms` : 'Waiting for data...'}
+				</span>
+				{rawTimeMs != null && overheadMs != null && (
+					<div className={`text-xs ${overheadColor}`}>
+						{`Raw: ${rawTimeMs.toFixed(1)}ms `}
+						<span className="font-semibold">{`(+${overheadMs.toFixed(1)}ms)`}</span>
+					</div>
+				)}
+			</div>
 		</div>
-	)
+	);
 };
 
-const UseQueryBenchmarks = observer(({ local_id }: { local_id: string }) => {
-	const [timings, setTimings] = useState<{ [key: string]: number | null }>({});
-	const allTimingsRecorded = useRef(false);
+const UseQueryBenchmarks = observer(
+	({ local_id, perfTestResults }: { local_id: string; perfTestResults: TestResult[] }) => {
+		const [timings, setTimings] = useState<{ [key: string]: number | null }>({});
+		const allTimingsRecorded = useRef(false);
 
-	const handleTimingComplete = (key: string, time: number) => {
-		setTimings(prev => {
-			if (prev[key] == null) {
-				return { ...prev, [key]: time };
+		const rawPerfMap = useMemo(() => {
+			const map = new Map<string, number>();
+			if (perfTestResults) {
+				perfTestResults.forEach(result => {
+					map.set(result.key, result.average);
+				});
 			}
-			return prev;
-		});
-	};
+			return map;
+		}, [perfTestResults]);
 
-	// Log to console when all timings are available
-	useEffect(() => {
-		const recordedCount = Object.values(timings).filter(t => t !== null).length;
-		if (recordedCount === Object.keys(useQueryBenchmarkQueries).length && !allTimingsRecorded.current) {
-			allTimingsRecorded.current = true;
-			console.log('=== USEQUERY TIME TO FIRST DATA ===');
-			Object.entries(useQueryBenchmarkQueries).forEach(([key, benchmark]) => {
-				const time = timings[key];
-				if (time) {
-					console.log(`${benchmark.query.title} (${key}): ${(time! / 1000).toFixed(2)}s`);
+		const handleTimingComplete = (key: string, time: number) => {
+			setTimings(prev => {
+				if (prev[key] == null) {
+					return { ...prev, [key]: time };
 				}
+				return prev;
 			});
-			console.log('====================================');
-		}
-	}, [timings]);
+		};
 
-	const queryEntries = useMemo(() => Object.entries(useQueryBenchmarkQueries), []);
+		// Log to console when all timings are available
+		useEffect(() => {
+			const recordedCount = Object.values(timings).filter(t => t !== null).length;
+			if (recordedCount === Object.keys(useQueryBenchmarkQueries).length && !allTimingsRecorded.current) {
+				allTimingsRecorded.current = true;
+				console.log('=== USEQUERY TIME TO FIRST DATA ===');
+				Object.entries(useQueryBenchmarkQueries).forEach(([key, benchmark]) => {
+					const time = timings[key];
+					if (time) {
+						console.log(`${benchmark.query.title} (${key}): ${(time! / 1000).toFixed(2)}s`);
+					}
+				});
+				console.log('====================================');
+			}
+		}, [timings]);
 
-	return (
-		<>
-			<div className="mb-6 p-4 bg-blue-50 rounded">
-				<h3 className="text-lg font-semibold mb-2">PowerSync useQuery Time to First Data</h3>
-				<div className="space-y-1 text-sm">
-					{queryEntries.map(([key, benchmark]) => (
-						<SingleQueryBenchmark
-							key={key}
-							queryKey={key}
-							query={benchmark.query}
-							params={benchmark.query.params.includes('userId') ? [local_id] : []}
-							isReady={benchmark.isReady}
-							onTimingComplete={handleTimingComplete}
-							initialTiming={timings[key] ?? null}
-						/>
-					))}
+		const queryEntries = useMemo(() => Object.entries(useQueryBenchmarkQueries), []);
+
+		return (
+			<>
+				<div className="mb-6 p-4 bg-blue-50 rounded">
+					<h3 className="text-lg font-semibold mb-2">PowerSync useQuery Time to First Data</h3>
+					<div className="space-y-1 text-sm">
+						{queryEntries.map(([key, benchmark]) => (
+							<SingleQueryBenchmark
+								key={key}
+								queryKey={key}
+								query={benchmark.query}
+								params={benchmark.query.params.includes('userId') ? [local_id] : []}
+								isReady={benchmark.isReady}
+								onTimingComplete={handleTimingComplete}
+								initialTiming={timings[key] ?? null}
+								rawPerfTime={rawPerfMap.get(key)}
+							/>
+						))}
+					</div>
 				</div>
-			</div>
-		</>
-	);
-});
+			</>
+		);
+	}
+);
 
 const PerfPage = observer(() => {
 	const db = usePowerSync();
@@ -245,7 +275,7 @@ const PerfPage = observer(() => {
 
 			<div className="bg-white rounded-lg shadow-lg p-6">
 				{rawTestsCompleted && local_id ? (
-					<UseQueryBenchmarks local_id={local_id} />
+					<UseQueryBenchmarks local_id={local_id} perfTestResults={perfTestResults} />
 				) : (
 					<div className="p-4 bg-blue-50 rounded">
 						<h3 className="text-lg font-semibold mb-2">PowerSync useQuery Results</h3>
