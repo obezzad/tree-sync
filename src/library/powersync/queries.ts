@@ -18,17 +18,17 @@ export interface QueryDefinition {
 export const queries: { [key: string]: QueryDefinition } = {
 	// Solely for benchmarks
 	coldStartProbe: {
-		title: 'Cold Start Sanity Check ("SELECT 1", should be <1ms) (used only for benchmarks)',
+		title: '⚗️ Cold Start Sanity Check ("SELECT 1", should be <1ms) (used only for benchmarks)',
 		sql: 'SELECT 1',
 		params: []
 	},
 	getSampleNodes: {
-		title: 'Fetch Sample Nodes (used only for benchmarks)',
+		title: '⚗️ Fetch Sample Nodes (used only for benchmarks)',
 		sql: 'SELECT id, created_at, user_id FROM nodes WHERE user_id = ? LIMIT 100',
 		params: ['userId']
 	},
 	getTotalNodeSizeForUser: {
-		title: 'Get Total Node Size for User (used only for benchmarks)',
+		title: '⚗️ Get Total Node Size for User (used only for benchmarks)',
 		sql: `SELECT
         SUM(
             IFNULL(LENGTH(id), 0) +

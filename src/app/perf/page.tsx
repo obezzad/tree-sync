@@ -125,6 +125,9 @@ const UseQueryBenchmarks = observer(
 			<>
 				<div className="mb-6 p-4 bg-blue-50 rounded">
 					<h3 className="text-lg font-semibold mb-2">PowerSync useQuery Time to First Data</h3>
+					<p className="text-sm text-gray-600 mb-2">
+						These queries are reactive and re-run on every change.
+					</p>
 					<div className="space-y-1 text-sm">
 						{queryEntries.map(([key, benchmark]) => (
 							<SingleQueryBenchmark
@@ -167,7 +170,10 @@ const PerfPage = observer(() => {
 	const { data: nodeCountData } = useQuery(queries.countUserNodes.sql, local_id ? [local_id] : []);
 	const syncedNodes = nodeCountData?.[0]?.count;
 
-	const { data: totalNodeSizeData } = useQuery(queries.getTotalNodeSizeForUser.sql, local_id ? [local_id] : []);
+	const { data: totalNodeSizeData } = useQuery(
+		queries.getTotalNodeSizeForUser.sql,
+		local_id ? [local_id] : []
+	);
 	const totalNodeSize = totalNodeSizeData?.[0]?.total_size;
 
 	const handleTestsStart = () => {
@@ -176,7 +182,16 @@ const PerfPage = observer(() => {
 	};
 
 	const handleNewResult = (result: TestResult) => {
-		setPerfTestResults(prevResults => [...prevResults, result]);
+		setPerfTestResults(prevResults => {
+			const newResults = [...prevResults];
+			const index = newResults.findIndex(r => r.key === result.key);
+			if (index !== -1) {
+				newResults[index] = result;
+			} else {
+				newResults.push(result);
+			}
+			return newResults;
+		});
 	};
 
 	const handleTestsComplete = () => {
@@ -198,25 +213,7 @@ const PerfPage = observer(() => {
 			await db.waitForReady();
 			setTimeToReady(performance.now() - mountTime);
 
-			// Run EXPLAIN QUERY PLAN for all non-mutation queries
-			if (local_id) {
-				const explainResults = new Map<string, any[]>();
-				const benchmarkQueries = Object.fromEntries(Object.entries(queries).filter(([, q]) => !q.isMutation));
-
-				for (const [key, query] of Object.entries(benchmarkQueries)) {
-					const params = query.params.includes('userId') ? [local_id] : [];
-					try {
-						const plan = await db.execute(`EXPLAIN QUERY PLAN ${query.sql}`, params);
-						explainResults.set(key, plan.rows?._array || []);
-					} catch (e: any) {
-						console.error(`Error explaining ${key}:`, e);
-						explainResults.set(key, [{ error: e.message }]);
-					}
-				}
-				perfTestRef.current?.runTests(explainResults);
-			} else {
-				perfTestRef.current?.runTests();
-			}
+			perfTestRef.current?.runTests();
 
 			await db.waitForFirstSync();
 			setTimeToFirstSync(performance.now() - mountTime);
@@ -299,18 +296,7 @@ const PerfPage = observer(() => {
 				onTestsComplete={handleTestsComplete}
 			/>
 
-			<div className="bg-white rounded-lg shadow-lg p-6">
-				{rawTestsCompleted && local_id ? (
-					<UseQueryBenchmarks local_id={local_id} perfTestResults={perfTestResults} />
-				) : (
-					<div className="p-4 bg-blue-50 rounded">
-						<h3 className="text-lg font-semibold mb-2">PowerSync useQuery Results</h3>
-						<div className="text-sm text-gray-500">
-							Waiting for wrapped database performance tests to complete...
-						</div>
-					</div>
-				)}
-			</div>
+			{rawTestsCompleted && local_id && <UseQueryBenchmarks local_id={local_id} perfTestResults={perfTestResults} />}
 
 			<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
 				<h2 className="text-lg font-bold mb-2">Performance Analysis Guide</h2>
