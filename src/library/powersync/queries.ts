@@ -59,6 +59,16 @@ export const queries: { [key: string]: QueryDefinition } = {
 	SELECT id FROM descendants`,
 		params: ['rootNodeId']
 	},
+	getNodesByParentId: {
+		title: 'Get Nodes by Parent ID',
+		sql: 'SELECT * FROM nodes WHERE parent_id = ?',
+		params: ['parentId']
+	},
+	getRootNodes: {
+		title: 'Get Root Nodes',
+		sql: 'SELECT * FROM nodes WHERE parent_id IS NULL',
+		params: []
+	},
 	countAllNodes: {
 		title: 'Count All Nodes',
 		sql: 'SELECT count(*) as count FROM nodes',

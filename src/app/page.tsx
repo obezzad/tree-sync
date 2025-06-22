@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { TreeView } from '@/components/TreeView/TreeView';
-import { NodeService } from '@/library/powersync/NodeService';
+import { Node, NodeService } from '@/library/powersync/NodeService';
 import { usePowerSync, useQuery } from '@powersync/react';
 import { useStatus } from '@powersync/react';
 import { AbstractPowerSyncDatabase } from '@powersync/web';
@@ -20,13 +20,36 @@ const Home = observer(() => {
 
   const local_id = store.session?.user?.user_metadata?.local_id;
   const [nodeService] = useState(() => new NodeService(db as AbstractPowerSyncDatabase));
+  const [loadedNodes, setLoadedNodes] = useState<Node[]>([]);
 
   const { data: allNodes } = useQuery(queries.countAllNodes.sql);
   const { data: userNodes } = useQuery(queries.countUserNodes.sql, [local_id]);
-  const { data: nodes } = useQuery(queries.getAllNodes.sql, []);
+  const { data: rootNodes } = useQuery<Node>(queries.getRootNodes.sql, []);
   const { data: buckets } = useQuery(queries.countOplogBuckets.sql);
   const { data: pendingUpload } = useQuery(queries.countPendingUploads.sql);
   const { downloadProgress, dataFlowStatus, connected, hasSynced } = useStatus();
+
+  useEffect(() => {
+    if (rootNodes) {
+      setLoadedNodes(rootNodes);
+    }
+  }, [rootNodes]);
+
+  const loadChildren = useCallback(
+    async (parentId: string) => {
+      if (!db) return;
+      const result = await db.execute(queries.getNodesByParentId.sql, [parentId]);
+      const children = result.rows?._array as Node[] | undefined;
+      if (children) {
+        setLoadedNodes((currentNodes) => {
+          const existingIds = new Set(currentNodes.map((n) => n.id));
+          const newNodes = children.filter((n) => !existingIds.has(n.id));
+          return [...currentNodes, ...newNodes];
+        });
+      }
+    },
+    [db]
+  );
 
   useEffect(() => {
     registerStart();
@@ -34,7 +57,7 @@ const Home = observer(() => {
 
   useEffect(() => {
     registerLastSync();
-  }, [nodes]);
+  }, [loadedNodes]);
 
   useEffect(() => {
     if (!store.selectedNodeId) {
@@ -91,8 +114,9 @@ const Home = observer(() => {
       </aside>
       <section className="flex-1 h-full overflow-y-auto">
         <TreeView
-          nodes={nodes}
+          nodes={loadedNodes}
           nodeService={nodeService}
+          loadChildren={loadChildren}
         />
       </section>
     </main>

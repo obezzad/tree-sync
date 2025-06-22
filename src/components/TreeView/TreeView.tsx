@@ -21,16 +21,33 @@ interface TreeViewProps {
   nodes: Node[];
   nodeService: NodeService;
   readOnly?: boolean;
+  loadChildren?: (parentId: string) => Promise<void>;
 }
 
 const ROW_HEIGHT = 48; // 40px height + 8px margin
 
 const MemoizedTreeNode = memo(TreeNode);
 
-export const TreeView = observer(({ nodes, nodeService, readOnly = false }: TreeViewProps) => {
+export const TreeView = observer(({ nodes, nodeService, readOnly = false, loadChildren }: TreeViewProps) => {
   const [isBulkAddModalOpen, setIsBulkAddModalOpen] = useState(false);
   const [selectedNodeForBulk, setSelectedNodeForBulk] = useState<string | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+
+  const handleToggleExpand = useCallback(
+    (nodeId: string) => {
+      setExpandedNodes((prev) => {
+        const next = new Set(prev);
+        if (next.has(nodeId)) {
+          next.delete(nodeId);
+        } else {
+          next.add(nodeId);
+          loadChildren?.(nodeId);
+        }
+        return next;
+      });
+    },
+    [loadChildren]
+  );
 
   const nodeMap = useMemo(() => {
     const map = new Map<string, Node>();
@@ -104,7 +121,7 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
         }
       }
     }
-  }, [rootStore.selectedNodeId]);
+  }, [rootStore.selectedNodeId, flattenedNodes, expandedNodes, handleToggleExpand]);
 
   const isNodeAncestorOf = useCallback((potentialAncestorId: string, nodeId: string): boolean => {
     let currentNode = nodeMap.get(nodeId);
@@ -182,18 +199,6 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
       toast.error(error.message ?? 'Failed to delete node');
     }
   }, [readOnly, nodeService]);
-
-  const handleToggleExpand = useCallback((nodeId: string) => {
-    setExpandedNodes(prev => {
-      const next = new Set(prev);
-      if (!next.has(nodeId)) {
-        next.add(nodeId);
-      } else {
-        next.delete(nodeId);
-      }
-      return next;
-    });
-  }, []);
 
   return (
     <ErrorBoundary>
