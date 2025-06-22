@@ -1,7 +1,7 @@
 import { PowerSyncDatabase, PowerSyncDatabaseOptions, QueryResult } from '@powersync/web';
 
 export class LoggingPowerSyncDatabase extends PowerSyncDatabase {
-	constructor(options: any) {
+	constructor(options: PowerSyncDatabaseOptions) {
 		super(options);
 	}
 

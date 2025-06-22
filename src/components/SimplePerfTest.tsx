@@ -112,10 +112,29 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>
 		setRunningTests(prev => new Set(prev).add(key));
 		const local_id = store.session?.user?.user_metadata?.local_id;
 		const rootNodeId = uuidv5('ROOT_NODE', userService.getUserId());
+		const test: QueryDefinition = queries[key];
 
-		const sampleNodesResult = await db.execute(queries.getSampleNodes.sql, [local_id]);
-		const sampleNodeIds = (sampleNodesResult.rows?._array || []).map((r: any) => r.id);
-		const sampleNodeId = sampleNodeIds[0];
+		if (test.isMutation) {
+			console.debug(`Skipping mutation test "${key}"`);
+			return;
+		}
+
+		let sampleNodeId: string | undefined;
+		let sampleNodeIds: string[] = [];
+
+		const needsSampleNodeId = test.params.includes('nodeId') || test.params.includes('focusedNodeId');
+		const needsSampleNodes = needsSampleNodeId || test.params.includes('expandedNodesJson');
+
+		if (needsSampleNodes) {
+			const sampleNodesResult = await db.execute(queries.getSampleNodes.sql, [local_id]);
+			sampleNodeIds = (sampleNodesResult.rows?._array || []).map((r: any) => r.id);
+			sampleNodeId = sampleNodeIds[0];
+		}
+
+		if (needsSampleNodeId && !sampleNodeId) {
+			console.log(`Skipping test "${test.title}" due to missing sample node.`);
+			return;
+		}
 
 		const resolveParams = (params: QueryParam[]): any[] => {
 			return params.map(p => {
@@ -144,17 +163,7 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>
 			});
 		};
 
-		if (queries[key].isMutation) {
-			console.debug(`Skipping mutation test "${key}"`);
-			return;
-		}
-		const test: QueryDefinition = queries[key];
 		const testParams = resolveParams(test.params);
-
-		if (test.params.includes('nodeId') && !sampleNodeId) {
-			console.log(`Skipping test "${test.title}" due to missing sample node.`);
-			return;
-		}
 
 		// Run EXPLAIN QUERY PLAN
 		let explainPlan: any[] = [];

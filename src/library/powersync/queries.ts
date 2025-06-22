@@ -29,11 +29,6 @@ export const queries: { [key: string]: QueryDefinition } = {
 		params: ['userId']
 	},
 	// Queries for the main app
-	getNodesByParentId: {
-		title: 'Get Nodes by Parent ID',
-		sql: 'SELECT *, EXISTS(SELECT 1 FROM nodes AS c WHERE c.parent_id = p.id) as has_children FROM nodes AS p WHERE p.parent_id = ?',
-		params: ['parentId']
-	},
 	getRootNodes: {
 		title: 'Get Root Nodes',
 		sql: 'SELECT *, EXISTS(SELECT 1 FROM nodes AS c WHERE c.parent_id = p.id) as has_children FROM nodes AS p WHERE p.parent_id IS NULL',
