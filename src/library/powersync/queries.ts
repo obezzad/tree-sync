@@ -45,6 +45,7 @@ export const queries: { [key: string]: QueryDefinition } = {
 		SELECT *, EXISTS(SELECT 1 FROM nodes AS c WHERE c.parent_id = p.id) as has_children
 		FROM nodes AS p
 		WHERE p.parent_id IS NULL OR p.parent_id IN (SELECT value FROM json_each(?))
+		ORDER BY p.archived_at ASC, p.id ASC
 		`,
 		params: ['expandedNodesJson']
 	},
