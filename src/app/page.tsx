@@ -87,8 +87,8 @@ const Home = observer(() => {
         <div className="text-gray-600 leading-tight">Selected nodes count: <b className="text-black">{store._syncedNodes.length}</b></div>
         <div className="leading-tight">
           {connected ?
-            <span className='text-green-500'>Connected</span> :
-            <span className='text-red-500'>Disconnected</span>}
+            <span className='text-green-500'>Connected to sync server</span> :
+            <span className='text-red-500'>Offline</span>}
           {' • '}
           {hasSynced ?
             <span className='text-green-500'>Initial sync done</span> :
