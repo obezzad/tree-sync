@@ -8,6 +8,7 @@ import type { Node } from '@/library/powersync/NodeService';
 
 interface TreeNodeData extends Node {
   children: TreeNodeData[];
+  has_children?: 0 | 1;
 }
 
 interface TreeNodeProps {
@@ -38,7 +39,7 @@ export const TreeNode = observer(({
   const [isHovered, setIsHovered] = useState(false);
   const [dragOverPosition, setDragOverPosition] = useState<'before' | 'after' | 'inside' | null>(null);
   const payload = JSON.parse(node.payload ?? '{}');
-  const hasChildren = node.children.length > 0;
+  const hasChildren = node.has_children === 1;
   const isRoot = level === 0;
 
   const handleDragStart = (e: React.DragEvent) => {
