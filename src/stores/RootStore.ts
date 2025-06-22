@@ -1,5 +1,5 @@
 import { makeAutoObservable, reaction, runInAction } from 'mobx';
-import { PowerSyncDatabase, WASQLiteOpenFactory, WASQLiteVFS } from '@powersync/web';
+import { WASQLiteOpenFactory, WASQLiteVFS } from '@powersync/web';
 import { AppSchema } from '@/library/powersync/AppSchema';
 import backendConnector from '@/library/powersync/BackendConnector';
 import { authService } from '@/library/auth/authService';
@@ -7,6 +7,7 @@ import { NAMESPACE, userService } from '@/library/powersync/userService';
 import type { Session } from '@/library/auth/types';
 import { v5 as uuidv5 } from 'uuid';
 import { measureOnce, METRICS, reset } from '@/utils/metrics';
+import { LoggingPowerSyncDatabase } from '../library/powersync/PowerSyncDatabase';
 
 const STORAGE_KEYS = {
   SEED: 'tree-sync-seed',
@@ -26,7 +27,7 @@ interface PersistedState {
 }
 
 export class RootStore {
-  db: PowerSyncDatabase | null = null;
+  db: LoggingPowerSyncDatabase | null = null;
   seed: string | null = null;
   session: Session | null = null;
   isInitializing = false;
@@ -136,7 +137,7 @@ export class RootStore {
   }
 
   private initializePowerSync() {
-    this.db = new PowerSyncDatabase({
+    this.db = new LoggingPowerSyncDatabase({
       database: new WASQLiteOpenFactory({
         dbFilename: 'powersync.db',
         vfs: WASQLiteVFS.OPFSCoopSyncVFS,
