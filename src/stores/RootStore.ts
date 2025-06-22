@@ -22,7 +22,6 @@ interface PersistedState {
   isInitializing: boolean;
   isOfflineMode: boolean;
   showArchivedNodes: boolean;
-  isFocusedView: boolean;
   _syncedNodes?: string[];
 }
 
@@ -35,7 +34,6 @@ export class RootStore {
   isAuthReady = false;
   isOfflineMode = false;
   showArchivedNodes = true;
-  isFocusedView = false;
   selectedNodeId: string | null = null;
   _syncedNodes: string[] = [];
 
@@ -168,7 +166,6 @@ export class RootStore {
       isInitializing: this.isInitializing,
       isOfflineMode: this.isOfflineMode,
       showArchivedNodes: this.showArchivedNodes,
-      isFocusedView: this.isFocusedView,
       _syncedNodes: this._syncedNodes
     };
 
@@ -187,7 +184,6 @@ export class RootStore {
           this.isInitializing = state.isInitializing;
           this.isOfflineMode = state.isOfflineMode;
           this.showArchivedNodes = state.showArchivedNodes;
-          this.isFocusedView = state.isFocusedView;
           this._syncedNodes = state._syncedNodes || [];
         });
       }
@@ -266,13 +262,6 @@ export class RootStore {
     runInAction(() => {
       this.showArchivedNodes = show;
       localStorage.setItem(STORAGE_KEYS.SHOW_ARCHIVED, show.toString());
-      this.persistState();
-    });
-  }
-
-  setFocusedView(enabled: boolean) {
-    runInAction(() => {
-      this.isFocusedView = enabled;
       this.persistState();
     });
   }

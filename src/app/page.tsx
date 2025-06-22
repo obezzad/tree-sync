@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { TreeView } from '@/components/TreeView/TreeView';
 import { NodeService } from '@/library/powersync/NodeService';
-import { usePowerSync } from '@powersync/react';
-import { useQuery, useStatus } from '@powersync/react';
+import { usePowerSync, useQuery } from '@powersync/react';
+import { useStatus } from '@powersync/react';
 import { AbstractPowerSyncDatabase } from '@powersync/web';
 import store from '@/stores/RootStore';
 import { observer } from 'mobx-react-lite';
@@ -23,22 +23,7 @@ const Home = observer(() => {
 
   const { data: allNodes } = useQuery(queries.countAllNodes.sql);
   const { data: userNodes } = useQuery(queries.countUserNodes.sql, [local_id]);
-  const { data: nodes } = useQuery(
-    store.isFocusedView ? queries.getSubtree.sql : queries.getAllNodes.sql,
-    store.isFocusedView
-      ? [
-          store.selectedNodeId,
-          store.selectedNodeId,
-          store.selectedNodeId,
-          store.selectedNodeId,
-          store.selectedNodeId,
-          store.selectedNodeId,
-          store.selectedNodeId,
-          store.selectedNodeId,
-          local_id
-        ]
-      : [local_id]
-  );
+  const { data: nodes } = useQuery(queries.getAllNodes.sql, []);
   const { data: buckets } = useQuery(queries.countOplogBuckets.sql);
   const { data: pendingUpload } = useQuery(queries.countPendingUploads.sql);
   const { downloadProgress, dataFlowStatus, connected, hasSynced } = useStatus();

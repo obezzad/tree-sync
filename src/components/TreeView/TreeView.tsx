@@ -5,7 +5,7 @@ import { AutoSizer, List } from 'react-virtualized';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import toast from 'react-hot-toast';
 import { TreeNode } from './TreeNode';
-import { ChevronDown, ChevronRight, Archive, Focus } from 'lucide-react';
+import { Archive } from 'lucide-react';
 import { BulkAddModal } from './BulkAddModal';
 import { NodeService } from '@/library/powersync/NodeService';
 import type { Node } from '@/library/powersync/NodeService';
@@ -30,7 +30,7 @@ const MemoizedTreeNode = memo(TreeNode);
 export const TreeView = observer(({ nodes, nodeService, readOnly = false }: TreeViewProps) => {
   const [isBulkAddModalOpen, setIsBulkAddModalOpen] = useState(false);
   const [selectedNodeForBulk, setSelectedNodeForBulk] = useState<string | null>(null);
-  const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
   const nodeMap = useMemo(() => {
     const map = new Map<string, Node>();
@@ -64,44 +64,30 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
       }));
     };
 
-    if (rootStore.isFocusedView) {
-      const selectedNode = nodes.find(node => node.id === rootStore.selectedNodeId);
-      if (selectedNode) {
-        return [{
-          ...selectedNode,
-          children: buildTree(selectedNode.id)
-        }];
-      }
-    }
-
     return buildTree(null);
-  }, [nodes, rootStore.isFocusedView, rootStore.selectedNodeId]);
+  }, [nodes]);
 
-  const collapsedNodesMap = useMemo(() => {
+  const expandedNodesMap = useMemo(() => {
     const map = new Map<string, boolean>();
     nodes.forEach(node => {
-      map.set(node.id, collapsedNodes.has(node.id));
+      map.set(node.id, expandedNodes.has(node.id));
     });
     return map;
-  }, [nodes, collapsedNodes]);
+  }, [nodes, expandedNodes]);
 
   const flattenedNodes = useMemo(() => {
-    if (rootStore.isFocusedView && treeData.length === 1) {
-      return [{ node: treeData[0], level: 0 }];
-    }
-
     const flattened: Array<{ node: TreeNodeData; level: number }> = [];
     const flatten = (tree: TreeNodeData[], level: number) => {
       tree.forEach(treeNode => {
         flattened.push({ node: treeNode, level });
-        if (!collapsedNodesMap.get(treeNode.id) && treeNode.children.length > 0) {
+        if (expandedNodesMap.get(treeNode.id) && treeNode.children.length > 0) {
           flatten(treeNode.children, level + 1);
         }
       });
     };
     flatten(treeData, 0);
     return flattened;
-  }, [treeData, collapsedNodesMap, rootStore.isFocusedView]);
+  }, [treeData, expandedNodesMap]);
 
   const listRef = useRef<List>(null);
 
@@ -112,9 +98,13 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
       );
       if (selectedIndex !== -1) {
         listRef.current.scrollToRow(selectedIndex);
+        const selectedNode = flattenedNodes[selectedIndex];
+        if (selectedNode && !expandedNodes.has(selectedNode.node.id)) {
+          handleToggleExpand(selectedNode.node.id);
+        }
       }
     }
-  }, [rootStore.selectedNodeId, flattenedNodes]);
+  }, [rootStore.selectedNodeId]);
 
   const isNodeAncestorOf = useCallback((potentialAncestorId: string, nodeId: string): boolean => {
     let currentNode = nodeMap.get(nodeId);
@@ -194,7 +184,7 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
   }, [readOnly, nodeService]);
 
   const handleToggleExpand = useCallback((nodeId: string) => {
-    setCollapsedNodes(prev => {
+    setExpandedNodes(prev => {
       const next = new Set(prev);
       if (!next.has(nodeId)) {
         next.add(nodeId);
@@ -208,17 +198,7 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
   return (
     <ErrorBoundary>
       <div className="w-full max-w-3xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200">
-      <div className="p-2 border-b border-gray-200 flex justify-between items-center">
-        <button
-          onClick={() => rootStore.setFocusedView(!rootStore.isFocusedView)}
-          className={`px-3 py-1 text-sm ${rootStore.isFocusedView ? 'text-blue-600 bg-blue-100' : 'text-gray-600 bg-gray-100'} hover:text-gray-800 rounded flex items-center gap-1`}
-          disabled={!rootStore.selectedNodeId}
-          title={rootStore.selectedNodeId ? "Focus on selected node" : "Select a node to focus"}
-        >
-          <Focus className="w-4 h-4" />
-          {rootStore.isFocusedView ? 'Exit Focus' : 'Focus View'}
-        </button>
-
+      <div className="p-2 border-b border-gray-200 flex justify-end items-center">
         <div className="flex gap-2">
           <button
             onClick={() => rootStore.setShowArchivedNodes(!rootStore.showArchivedNodes)}
@@ -226,44 +206,6 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
           >
             <Archive className="w-4 h-4" />
             {rootStore.showArchivedNodes ? 'Hide Archived' : 'Show Archived'}
-          </button>
-          <button
-            onClick={() => {
-              if (collapsedNodes.size === 0) {
-                const batchSize = 10000;
-                const newCollapsed = new Set<string>();
-
-                const processChunk = (startIndex: number) => {
-                  const endIndex = Math.min(startIndex + batchSize, nodes.length);
-                  for (let i = startIndex; i < endIndex; i++) {
-                    newCollapsed.add(nodes[i].id);
-                  }
-
-                  if (endIndex < nodes.length) {
-                    requestAnimationFrame(() => processChunk(endIndex));
-                  } else {
-                    setCollapsedNodes(newCollapsed);
-                  }
-                };
-
-                requestAnimationFrame(() => processChunk(0));
-              } else {
-                setCollapsedNodes(new Set());
-              }
-            }}
-            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 bg-gray-100 rounded flex items-center gap-1"
-          >
-            {collapsedNodes.size === 0 ? (
-              <>
-                <ChevronDown className="w-4 h-4" />
-                Collapse All
-              </>
-            ) : (
-              <>
-                <ChevronRight className="w-4 h-4" />
-                Expand All
-              </>
-            )}
           </button>
         </div>
       </div>
@@ -304,7 +246,7 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false }: Tree
                           onMove={handleMove}
                           onBulkAdd={handleBulkAdd}
                           readOnly={readOnly}
-                          isExpanded={!collapsedNodesMap.get(node.id)}
+                          isExpanded={!!expandedNodesMap.get(node.id)}
                           onToggleExpand={handleToggleExpand}
                         />
                       </div>
