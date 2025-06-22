@@ -102,6 +102,10 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false, expand
 
       if (selectedIndex !== -1) {
         listRef.current.scrollToRow(selectedIndex);
+        const { node: selectedNode } = flattenedNodes[selectedIndex];
+        if (!expandedNodes.has(selectedNode.id)) {
+          onToggleExpand(selectedNode.id);
+        }
       } else {
         const node = nodeMap.get(selectedNodeId);
         if (node) {
@@ -159,9 +163,6 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false, expand
           rootStore.setSelectedNodeId(newParentId);
         }
         console.debug('   moveNode resolved');
-        if (dropTargetNodeId && !expandedNodes.has(dropTargetNodeId)) {
-          onToggleExpand(dropTargetNodeId);
-        }
         toast.success('Node moved successfully');
       } catch (error: any) {
         console.error('Failed to move node:', error);
@@ -180,9 +181,6 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false, expand
           parent_id: parentId,
           payload: JSON.stringify({ name: treeUtils.generateReadableName() })
         });
-        if (parentId && !expandedNodes.has(parentId)) {
-          onToggleExpand(parentId);
-        }
         if (newParentId) {
           rootStore.setSelectedNodeId(newParentId);
         }
