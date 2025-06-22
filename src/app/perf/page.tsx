@@ -6,10 +6,110 @@ import { useQuery, useStatus } from '@powersync/react';
 import store from '@/stores/RootStore';
 import { observer } from 'mobx-react-lite';
 import { SimplePerfTest, SimplePerfTestRef, TestResult } from '@/components/SimplePerfTest';
+import { queries } from '@/library/powersync/queries';
+
+const UseQueryBenchmarks = observer(({ local_id }: { local_id: string }) => {
+	const [timings, setTimings] = useState<{ [key: string]: number | null }>({});
+	const allTimingsRecorded = useRef(false);
+
+	const benchmarkQueries = {
+		'Time to First Count All Nodes': {
+			query: queries.countAllNodes,
+			params: [],
+			isReady: (data: any) => data && data[0] && data[0].count > 0,
+		},
+		'Time to First Count User Nodes': {
+			query: queries.countUserNodes,
+			params: [local_id],
+			isReady: (data: any) => data && data[0] && data[0].count > 0,
+		},
+		'Time to First Fetched Sample': {
+			query: queries.getSampleNodes,
+			params: [local_id],
+			isReady: (data: any) => data && data.length > 0,
+		}
+	};
+
+	// --- Query 1 ---
+	const startTime1 = useRef(performance.now());
+	const { data: allNodes } = useQuery(benchmarkQueries['Time to First Count All Nodes'].query.sql);
+	useEffect(() => {
+		if (benchmarkQueries['Time to First Count All Nodes'].isReady(allNodes) && timings['Time to First Count All Nodes'] === undefined) {
+			const time = performance.now() - startTime1.current;
+			setTimings(prev => ({ ...prev, 'Time to First Count All Nodes': time }));
+		}
+	}, [allNodes]);
+
+	// --- Query 2 ---
+	const startTime2 = useRef(performance.now());
+	const { data: userNodes } = useQuery(benchmarkQueries['Time to First Count User Nodes'].query.sql, [local_id]);
+	useEffect(() => {
+		if (benchmarkQueries['Time to First Count User Nodes'].isReady(userNodes) && timings['Time to First Count User Nodes'] === undefined) {
+			const time = performance.now() - startTime2.current;
+			setTimings(prev => ({ ...prev, 'Time to First Count User Nodes': time }));
+		}
+	}, [userNodes]);
+
+	// --- Query 3 ---
+	const startTime3 = useRef(performance.now());
+	const { data: sampleNodes } = useQuery(benchmarkQueries['Time to First Fetched Sample'].query.sql, [local_id]);
+	useEffect(() => {
+		if (benchmarkQueries['Time to First Fetched Sample'].isReady(sampleNodes) && timings['Time to First Fetched Sample'] === undefined) {
+			const time = performance.now() - startTime3.current;
+			setTimings(prev => ({ ...prev, 'Time to First Fetched Sample': time }));
+		}
+	}, [sampleNodes]);
+
+	// Log to console when all timings are available
+	useEffect(() => {
+		const recordedCount = Object.values(timings).filter(t => t !== null).length;
+		if (recordedCount === Object.keys(benchmarkQueries).length && !allTimingsRecorded.current) {
+			allTimingsRecorded.current = true;
+			console.log('=== USEQUERY TIME TO FIRST DATA ===');
+			Object.entries(timings).forEach(([query, time]) => {
+				console.log(`${query}: ${(time! / 1000).toFixed(2)}s`);
+			});
+			console.log('====================================');
+		}
+	}, [timings]);
+
+	return (
+		<>
+			<div className="mb-6 p-4 bg-blue-50 rounded">
+				<h3 className="text-lg font-semibold mb-2">PowerSync useQuery Results</h3>
+				<div className="grid grid-cols-2 gap-4 text-sm">
+					<div>Total Nodes: <span className="font-bold">{allNodes?.[0]?.count ?? 'Loading...'}</span></div>
+					<div>User Nodes: <span className="font-bold">{userNodes?.[0]?.count ?? 'Loading...'}</span></div>
+					<div>Sample Fetched: <span className="font-bold">{sampleNodes?.length ?? 'Loading...'}</span></div>
+				</div>
+
+				<div className="mt-4 pt-4 border-t border-blue-200">
+					<h4 className="font-semibold mb-2 text-md">Time to First Data</h4>
+					<div className="space-y-1 text-sm">
+						{Object.keys(benchmarkQueries).map((name) => (
+							<div key={name} className="flex justify-between">
+								<span>{name}:</span>
+								<span className="font-bold font-mono">
+									{timings[name] != null ? `${((timings[name] as number)/1000).toFixed(2)}s` : 'Waiting for data...'}
+								</span>
+							</div>
+						))}
+					</div>
+				</div>
+			</div>
+
+			<div className="p-4 bg-gray-50 rounded">
+				<h4 className="font-semibold mb-2">Sample Data (First 100 nodes)</h4>
+				<pre className="text-xs overflow-auto max-h-40">
+						{JSON.stringify(sampleNodes, null, 2)}
+					</pre>
+			</div>
+		</>
+	);
+});
 
 const PerfPage = observer(() => {
 	const db = usePowerSync();
-	const [testStarted, setTestStarted] = useState(false);
 	const mountTimeRef = useRef<number | null>(null);
 	const perfTestRef = useRef<SimplePerfTestRef>(null);
 	const initialRunStarted = useRef(false);
@@ -19,30 +119,11 @@ const PerfPage = observer(() => {
 	const [timeToFirstSync, setTimeToFirstSync] = useState<number | null>(null);
 	const [perfTestResults, setPerfTestResults] = useState<TestResult[]>([]);
 	const [isPerfTestRunning, setIsPerfTestRunning] = useState(false);
+	const [rawTestsCompleted, setRawTestsCompleted] = useState(false);
 
 	if (!db) throw new Error('PowerSync context not found');
 
 	const local_id = store.session?.user?.user_metadata?.local_id;
-
-	// Test Query 1: Simple count all nodes
-	const startTime1 = performance.now();
-	const { data: allNodes } = useQuery('SELECT count(id) as count FROM nodes');
-	const endTime1 = performance.now();
-
-	// Test Query 2: Count user nodes
-	const startTime2 = performance.now();
-	const { data: userNodes } = useQuery('SELECT count(id) as count FROM nodes WHERE user_id = ?', [local_id]);
-	const endTime2 = performance.now();
-
-	// Test Query 3: Count remote nodes (non-pending)
-	const startTime3 = performance.now();
-	const { data: remoteNodes } = useQuery('SELECT count(id) as count FROM nodes WHERE user_id = ? AND _is_pending IS NULL', [local_id]);
-	const endTime3 = performance.now();
-
-	// Test Query 4: Simple node fetch with limit
-	const startTime4 = performance.now();
-	const { data: sampleNodes } = useQuery('SELECT id, created_at, user_id FROM nodes WHERE user_id = ? LIMIT 100', [local_id]);
-	const endTime4 = performance.now();
 
 	const { connected, hasSynced } = useStatus();
 
@@ -57,6 +138,7 @@ const PerfPage = observer(() => {
 
 	const handleTestsComplete = () => {
 		setIsPerfTestRunning(false);
+		setRawTestsCompleted(true);
 	};
 
 	useEffect(() => {
@@ -91,25 +173,6 @@ const PerfPage = observer(() => {
 		}
 	}, [connected, hasSynced, timeToConnected, timeToSynced]);
 
-	// Track query times
-	useEffect(() => {
-		if (allNodes && userNodes && remoteNodes && sampleNodes && !testStarted) {
-			setTestStarted(true);
-			const times = {
-				'Count All Nodes (useQuery)': endTime1 - startTime1,
-				'Count User Nodes (useQuery)': endTime2 - startTime2,
-				'Count Remote Nodes (useQuery)': endTime3 - startTime3,
-				'Fetch Sample Nodes (useQuery)': endTime4 - startTime4,
-			};
-
-			console.log('=== USEQUERY PERFORMANCE TEST ===');
-			Object.entries(times).forEach(([query, time]) => {
-				console.log(`${query}: ${time.toFixed(2)}ms`);
-			});
-			console.log('====================================');
-		}
-	}, [allNodes, userNodes, remoteNodes, sampleNodes, testStarted, endTime1, startTime1, endTime2, startTime2, endTime3, startTime3, endTime4, startTime4]);
-
 	return (
 		<main className="p-8 max-w-6xl mx-auto space-y-8">
 			<div className="bg-gray-100 border border-gray-300 rounded-lg p-4">
@@ -138,29 +201,23 @@ const PerfPage = observer(() => {
 						<div>Connected to Server: <span className={connected ? 'text-green-600' : 'text-red-600'}>{connected ? 'Yes' : 'No'}</span></div>
 						<div>User ID: <span className="font-mono text-xs">{local_id}</span></div>
 						<div className="pt-2">
-							<div>Time to Ready: <b className="font-mono">{timeToReady !== null ? `${(timeToReady / 1000).toFixed(2)}s` : '...'}</b></div>
+							<div>Time to DB Ready: <b className="font-mono">{timeToReady !== null ? `${(timeToReady / 1000).toFixed(2)}s` : '...'}</b></div>
 							<div>Time to First Sync: <b className="font-mono">{timeToFirstSync !== null ? `${(timeToFirstSync / 1000).toFixed(2)}s` : '...'}</b></div>
 							<div>Time to Connect: <b className="font-mono">{timeToConnected !== null ? `${(timeToConnected / 1000).toFixed(2)}s` : '...'}</b></div>
 						</div>
 					</div>
 				</div>
 
-				<div className="mb-6 p-4 bg-blue-50 rounded">
-					<h3 className="text-lg font-semibold mb-2">PowerSync useQuery Results</h3>
-					<div className="grid grid-cols-2 gap-4 text-sm">
-						<div>Total Nodes: <span className="font-bold">{allNodes?.[0]?.count ?? 'Loading...'}</span></div>
-						<div>User Nodes: <span className="font-bold">{userNodes?.[0]?.count ?? 'Loading...'}</span></div>
-						<div>Synced Nodes: <span className="font-bold">{remoteNodes?.[0]?.count ?? 'Loading...'}</span></div>
-						<div>Sample Fetched: <span className="font-bold">{sampleNodes?.length ?? 'Loading...'}</span></div>
+				{rawTestsCompleted && local_id ? (
+					<UseQueryBenchmarks local_id={local_id} />
+				) : (
+					<div className="mb-6 p-4 bg-blue-50 rounded">
+						<h3 className="text-lg font-semibold mb-2">PowerSync useQuery Results</h3>
+						<div className="text-sm text-gray-500">
+							Waiting for raw performance tests to complete...
+						</div>
 					</div>
-				</div>
-
-				<div className="p-4 bg-gray-50 rounded">
-					<h4 className="font-semibold mb-2">Sample Data (First 3 nodes)</h4>
-					<pre className="text-xs overflow-auto max-h-40">
-						{JSON.stringify(sampleNodes?.slice(0, 3), null, 2)}
-					</pre>
-				</div>
+				)}
 			</div>
 
 			<SimplePerfTest
