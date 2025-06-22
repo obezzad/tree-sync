@@ -35,7 +35,7 @@ export class NodeService {
       args: { ...data, id: node_id },
       optimisticUpdate: async (tx: Transaction) => {
         const insertResult = await tx.execute(
-          queries.insertNode,
+          queries.insertNode.sql,
           [node_id, data.payload ?? '{}', user_id, data.parent_id]
         );
 
@@ -57,7 +57,7 @@ export class NodeService {
       optimisticUpdate: async (tx: Transaction) => {
         // HACK: Simple and efficient optimistic parent update without recursion
         const updateResult = await tx.execute(
-          queries.moveNode,
+          queries.moveNode.sql,
           [newParentId, nodeId]
         );
         return updateResult.rows?._array.map(row => row.id) ?? [];
@@ -76,7 +76,7 @@ export class NodeService {
       args: { node_id },
       optimisticUpdate: async (tx: Transaction) => {
         // HACK: Archive only the parent node
-        const updateResult = await tx.execute(queries.archiveNode, [isRoot, node_id, node_id]);
+        const updateResult = await tx.execute(queries.archiveNode.sql, [isRoot, node_id, node_id]);
 
         return updateResult.rows?._array.map(row => row.id) ?? [];
       }

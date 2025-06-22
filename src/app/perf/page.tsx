@@ -12,6 +12,7 @@ const PerfPage = observer(() => {
 	const [testStarted, setTestStarted] = useState(false);
 	const mountTimeRef = useRef<number | null>(null);
 	const perfTestRef = useRef<SimplePerfTestRef>(null);
+	const initialRunStarted = useRef(false);
 	const [timeToConnected, setTimeToConnected] = useState<number | null>(null);
 	const [timeToSynced, setTimeToSynced] = useState<number | null>(null);
 	const [timeToReady, setTimeToReady] = useState<number | null>(null);
@@ -63,6 +64,10 @@ const PerfPage = observer(() => {
 
 		const measurePromises = async () => {
 			if (!db || !mountTimeRef.current) return;
+
+			if (initialRunStarted.current) return;
+			initialRunStarted.current = true;
+
 			const mountTime = mountTimeRef.current;
 
 			await db.waitForReady();

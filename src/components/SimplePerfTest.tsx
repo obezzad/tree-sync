@@ -4,8 +4,8 @@ import { forwardRef, useImperativeHandle } from 'react';
 import { usePowerSync } from '@powersync/react';
 import { AbstractPowerSyncDatabase } from '@powersync/web';
 import store from '@/stores/RootStore';
-import { queries } from '@/library/powersync/queries';
-import { v5 as uuidv5 } from 'uuid';
+import { queries, QueryDefinition, QueryParam } from '@/library/powersync/queries';
+import { v4 as uuidv4, v5 as uuidv5 } from 'uuid';
 import { userService } from '@/library/powersync/userService';
 
 export interface TestResult {
@@ -36,35 +36,75 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>
 		if (!db || isRunning) return;
 
 		onTestsStart();
+
+		// Hardcoded cold start test
+		const coldStartRuns: number[] = [];
+		for (let i = 0; i < 3; i++) {
+			const start = performance.now();
+			await db.execute('SELECT 1 as probe');
+			const duration = performance.now() - start;
+			coldStartRuns.push(duration);
+			await new Promise(resolve => setTimeout(resolve, 50)); // Small delay between runs
+		}
+		const coldStartAverage = coldStartRuns.reduce((a, b) => a + b, 0) / coldStartRuns.length;
+		onNewResult({ name: 'Cold Start Probe (SELECT 1)', runs: coldStartRuns, average: coldStartAverage });
+
 		const local_id = store.session?.user?.user_metadata?.local_id;
 		const rootNodeId = uuidv5('ROOT_NODE', userService.getUserId());
+		const sampleNode: any | undefined = await db.get('SELECT id FROM nodes LIMIT 1');
+		const sampleNodeId = sampleNode?.id;
 
-		const tests = [
-			{ name: 'Cold Start Probe (SELECT 1)', query: 'SELECT 1 as probe', params: [] },
-			{ name: 'List All Node IDs', query: queries.getAllNodeIds, params: [] },
-			{
-				name: 'List All Node IDs for User',
-				query: queries.getAllNodeIdsForUser,
-				params: [local_id]
-			},
-			{
-				name: 'List All Descendant IDs of Root',
-				query: queries.getDescendantsOfNode,
-				params: [rootNodeId]
+		const resolveParams = (params: QueryParam[]): any[] => {
+			return params.map(p => {
+				switch (p) {
+					case 'userId':
+						return local_id;
+					case 'rootNodeId':
+						return rootNodeId;
+					case 'nodeId':
+						return sampleNodeId;
+					case 'focusedNodeId':
+						return sampleNodeId;
+					case 'parentId':
+						return rootNodeId;
+					case 'newNodeId':
+						return uuidv4();
+					case 'payload':
+						return JSON.stringify({ content: `New node ${new Date().toISOString()}` });
+					case 'isRecursive':
+						return false;
+					default:
+						return null;
+				}
+			});
+		};
+
+		for (const key in queries) {
+			if (queries[key].isMutation) {
+				console.debug(`Skipping mutation test "${key}"`);
+				continue;
 			}
-		];
+			const test: QueryDefinition = queries[key];
+			const testParams = resolveParams(test.params);
 
-		for (const test of tests) {
+			if (test.params.includes('nodeId') && !sampleNodeId) {
+				console.log(`Skipping test "${test.title}" due to missing sample node.`);
+				continue;
+			}
+
 			const runs: number[] = [];
-			for (let i = 0; i < 3; i++) {
+			const loopCount = 3;
+			for (let i = 0; i < loopCount; i++) {
 				const start = performance.now();
-				await db.execute(test.query, test.params);
+				await db.execute(test.sql, testParams);
 				const duration = performance.now() - start;
 				runs.push(duration);
-				await new Promise(resolve => setTimeout(resolve, 50)); // Small delay between runs
+				if (loopCount > 1) {
+					await new Promise(resolve => setTimeout(resolve, 50)); // Small delay between runs
+				}
 			}
 			const average = runs.reduce((a, b) => a + b, 0) / runs.length;
-			onNewResult({ name: test.name, runs, average });
+			onNewResult({ name: test.title, runs, average });
 		}
 		onTestsComplete();
 	};
@@ -120,11 +160,20 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>
 												: 'text-green-600'
 									}`}
 								>
-									{result.average.toFixed(1)}ms
+									{result.average > 1
+										? `${result.average.toFixed(1)}ms`
+										: `${(result.average * 1000).toFixed(1)}µs`}
 								</div>
 							</div>
 							<div className="text-sm text-gray-600">
-								Runs: {result.runs.map(r => `${r.toFixed(1)}ms`).join(', ')}
+								Runs:{' '}
+								{result.runs
+									.map(r =>
+										r > 1
+											? `${r.toFixed(1)}ms`
+											: `${(r * 1000).toFixed(1)}µs`
+									)
+									.join(', ')}
 							</div>
 						</div>
 					))}

@@ -21,10 +21,10 @@ const Home = observer(() => {
   const local_id = store.session?.user?.user_metadata?.local_id;
   const [nodeService] = useState(() => new NodeService(db as AbstractPowerSyncDatabase));
 
-  const { data: allNodes } = useQuery(queries.countAllNodes);
-  const { data: userNodes } = useQuery(queries.countUserNodes, [local_id]);
+  const { data: allNodes } = useQuery(queries.countAllNodes.sql);
+  const { data: userNodes } = useQuery(queries.countUserNodes.sql, [local_id]);
   const { data: nodes } = useQuery(`
-    ${queries.mainAppQuery}
+    ${queries.getSubtree.sql}
       ${store.showArchivedNodes ? '' : 'AND archived_at IS NULL'}
       ${store.isFocusedView ? 'AND id IN (SELECT id FROM focused_nodes)' : ''}
     ORDER BY created_at DESC, id
@@ -35,8 +35,8 @@ const Home = observer(() => {
     store.selectedNodeId, store.selectedNodeId,
     local_id
   ]);
-  const { data: buckets } = useQuery(queries.countOplogBuckets);
-  const { data: pendingUpload } = useQuery(queries.countPendingUploads);
+  const { data: buckets } = useQuery(queries.countOplogBuckets.sql);
+  const { data: pendingUpload } = useQuery(queries.countPendingUploads.sql);
   const { downloadProgress, dataFlowStatus, connected, hasSynced } = useStatus();
 
   useEffect(() => {
