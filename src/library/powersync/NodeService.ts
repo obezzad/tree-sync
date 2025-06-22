@@ -43,7 +43,7 @@ export class NodeService {
       }
     });
 
-    store.setSelectedNodeId(data.parent_id!);
+    return data.parent_id;
   }
 
   async moveNode(nodeId: string, newParentId: string | null) {
@@ -65,7 +65,7 @@ export class NodeService {
     });
     console.log('[NodeService] moveNode DONE');
 
-    store.setSelectedNodeId(newParentId);
+    return newParentId;
   }
 
   async deleteNode(node_id: string) {

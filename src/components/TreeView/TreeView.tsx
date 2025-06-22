@@ -154,7 +154,10 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false, expand
           throw new Error('Siblings reordering is not supported yet');
         }
 
-        await nodeService.moveNode(draggedNodeId, dropTargetNodeId);
+        const newParentId = await nodeService.moveNode(draggedNodeId, dropTargetNodeId);
+        if (newParentId) {
+          rootStore.setSelectedNodeId(newParentId);
+        }
         console.debug('   moveNode resolved');
         if (dropTargetNodeId && !expandedNodes.has(dropTargetNodeId)) {
           onToggleExpand(dropTargetNodeId);
@@ -173,12 +176,15 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false, expand
       if (readOnly) return;
 
       try {
-        await nodeService.createNode({
+        const newParentId = await nodeService.createNode({
           parent_id: parentId,
           payload: JSON.stringify({ name: treeUtils.generateReadableName() })
         });
         if (parentId && !expandedNodes.has(parentId)) {
           onToggleExpand(parentId);
+        }
+        if (newParentId) {
+          rootStore.setSelectedNodeId(newParentId);
         }
         toast.success('Node added successfully');
       } catch (error: any) {
