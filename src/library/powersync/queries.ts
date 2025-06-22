@@ -16,57 +16,42 @@ export interface QueryDefinition {
 }
 
 export const queries: { [key: string]: QueryDefinition } = {
+	// Solely for benchmarks
 	coldStartProbe: {
-		title: 'Cold Start Sanity Check ("SELECT 1", should be <1ms)',
+		title: 'Cold Start Sanity Check ("SELECT 1", should be <1ms) (used only for benchmarks)',
 		sql: 'SELECT 1',
 		params: []
 	},
 	getSampleNodes: {
-		title: 'Fetch Sample Nodes',
+		title: 'Fetch Sample Nodes (used only for benchmarks)',
 		sql: 'SELECT id, created_at, user_id FROM nodes WHERE user_id = ? LIMIT 100',
 		params: ['userId']
 	},
-	getAllNodeIds: {
-		title: 'List All Node IDs',
-		sql: 'SELECT id FROM nodes',
-		params: []
-	},
-	getAllNodeIdsForUser: {
-		title: 'List All Node IDs for User',
-		sql: 'SELECT id FROM nodes WHERE user_id = ?',
+	getTotalNodeSizeForUser: {
+		title: 'Get Total Node Size for User (used only for benchmarks)',
+		sql: `SELECT
+        SUM(
+            IFNULL(LENGTH(id), 0) +
+            IFNULL(LENGTH(created_at), 0) +
+            IFNULL(LENGTH(payload), 0) +
+            IFNULL(LENGTH(user_id), 0) +
+            IFNULL(LENGTH(parent_id), 0) +
+            IFNULL(LENGTH(rank), 0) +
+            IFNULL(LENGTH(archived_at), 0)
+        ) as total_size
+        FROM nodes
+        WHERE user_id = ?`,
 		params: ['userId']
 	},
-	getAllNodes: {
-		title: 'Get All Nodes',
-		sql: 'SELECT * FROM nodes',
-		params: []
-	},
-	getAllNodesForUser: {
-		title: 'Get All Nodes for a User',
-		sql: 'SELECT * FROM nodes WHERE user_id = ?',
-		params: ['userId']
-	},
-	getDescendantsOfNode: {
-		title: 'List All Descendant IDs of Root',
-		sql: `
-	WITH RECURSIVE descendants(id) AS (
-		SELECT ? AS id
-		UNION ALL
-		SELECT n.id
-		FROM nodes n
-		JOIN descendants d ON n.parent_id = d.id
-	)
-	SELECT id FROM descendants`,
-		params: ['rootNodeId']
-	},
+	// Queries for the main app
 	getNodesByParentId: {
 		title: 'Get Nodes by Parent ID',
-		sql: 'SELECT * FROM nodes WHERE parent_id = ?',
+		sql: 'SELECT *, EXISTS(SELECT 1 FROM nodes AS c WHERE c.parent_id = p.id) as has_children FROM nodes AS p WHERE p.parent_id = ?',
 		params: ['parentId']
 	},
 	getRootNodes: {
 		title: 'Get Root Nodes',
-		sql: 'SELECT * FROM nodes WHERE parent_id IS NULL',
+		sql: 'SELECT *, EXISTS(SELECT 1 FROM nodes AS c WHERE c.parent_id = p.id) as has_children FROM nodes AS p WHERE p.parent_id IS NULL',
 		params: []
 	},
 	countAllNodes: {
@@ -88,22 +73,6 @@ export const queries: { [key: string]: QueryDefinition } = {
 		title: 'Count Oplog Buckets',
 		sql: `SELECT count(DISTINCT bucket) as bucket_count FROM ps_oplog`,
 		params: []
-	},
-	getTotalNodeSizeForUser: {
-		title: 'Get Total Node Size for User',
-		sql: `SELECT
-        SUM(
-            IFNULL(LENGTH(id), 0) +
-            IFNULL(LENGTH(created_at), 0) +
-            IFNULL(LENGTH(payload), 0) +
-            IFNULL(LENGTH(user_id), 0) +
-            IFNULL(LENGTH(parent_id), 0) +
-            IFNULL(LENGTH(rank), 0) +
-            IFNULL(LENGTH(archived_at), 0)
-        ) as total_size
-        FROM nodes
-        WHERE user_id = ?`,
-		params: ['userId']
 	},
 	// Mutations
 	insertNode: {
