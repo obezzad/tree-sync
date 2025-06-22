@@ -91,21 +91,33 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false, expand
   }, [treeData, expandedNodesMap]);
 
   const listRef = useRef<List>(null);
+  const lastSelectedNodeIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (listRef.current && rootStore.selectedNodeId) {
-      const selectedIndex = flattenedNodes.findIndex(
-        ({ node }) => node.id === rootStore.selectedNodeId
-      );
+    const { selectedNodeId } = rootStore;
+    if (listRef.current && selectedNodeId && selectedNodeId !== lastSelectedNodeIdRef.current) {
+      lastSelectedNodeIdRef.current = selectedNodeId;
+
+      const selectedIndex = flattenedNodes.findIndex(({ node }) => node.id === selectedNodeId);
+
       if (selectedIndex !== -1) {
         listRef.current.scrollToRow(selectedIndex);
-        const selectedNode = flattenedNodes[selectedIndex];
-        if (selectedNode && !expandedNodes.has(selectedNode.node.id)) {
-          onToggleExpand(selectedNode.node.id);
+      } else {
+        const node = nodeMap.get(selectedNodeId);
+        if (node) {
+          const parentIdsToExpand: string[] = [];
+          let parent = nodeMap.get(node.parent_id);
+          while (parent) {
+            if (!expandedNodes.has(parent.id)) {
+              parentIdsToExpand.push(parent.id);
+            }
+            parent = nodeMap.get(parent.parent_id);
+          }
+          parentIdsToExpand.reverse().forEach(onToggleExpand);
         }
       }
     }
-  }, [rootStore.selectedNodeId, flattenedNodes, expandedNodes, onToggleExpand]);
+  }, [rootStore.selectedNodeId, flattenedNodes, expandedNodes, onToggleExpand, nodeMap]);
 
   const isNodeAncestorOf = useCallback((potentialAncestorId: string, nodeId: string): boolean => {
     let currentNode = nodeMap.get(nodeId);
