@@ -118,7 +118,7 @@ const Home = observer(() => {
   const { data: pendingUpload } = useQuery(queries.countPendingUploads.sql);
   const { downloadProgress, dataFlowStatus, connected, hasSynced } = useStatus();
   const local_id = store.session?.user?.user_metadata?.local_id;
-  const { data: userNodes } = useQuery(queries.countUserNodes.sql, [local_id]);
+  const { data: userNodes } = useQuery(queries.countAllNodes.sql, [local_id]);
 
   useEffect(() => {
     if (!store.selectedNodeId) {

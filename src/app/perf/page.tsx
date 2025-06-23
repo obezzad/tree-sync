@@ -167,7 +167,7 @@ const PerfPage = observer(() => {
 
 	const { connected, hasSynced } = useStatus();
 
-	const { data: nodeCountData } = useQuery(queries.countUserNodes.sql, local_id ? [local_id] : []);
+	const { data: nodeCountData } = useQuery(queries.countAllNodes.sql, local_id ? [local_id] : []);
 	const syncedNodes = nodeCountData?.[0]?.count;
 
 	const handleTestsStart = () => {

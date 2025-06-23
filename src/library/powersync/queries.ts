@@ -81,11 +81,6 @@ export const queries: { [key: string]: QueryDefinition } = {
 		sql: 'SELECT count(*) as count FROM nodes',
 		params: []
 	},
-	countUserNodes: {
-		title: 'Count User Nodes',
-		sql: 'SELECT count(*) as count FROM nodes WHERE user_id = ?',
-		params: ['userId']
-	},
 	countPendingUploads: {
 		title: 'Count Pending Uploads',
 		sql: 'select count(distinct tx_id) as count from ps_crud',
