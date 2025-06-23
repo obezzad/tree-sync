@@ -7,7 +7,10 @@ export type QueryParam =
 	| 'payload'
 	| 'parentId'
 	| 'isRecursive'
-	| 'expandedNodesJson';
+	| 'limit'
+	| 'offset'
+	| 'expandedNodesJson'
+	| 'expandedLimitsJson';
 
 export interface QueryDefinition {
 	sql: string;
@@ -33,6 +36,68 @@ export const queries: { [key: string]: QueryDefinition } = {
 		title: 'Get Root Nodes',
 		sql: 'SELECT *, EXISTS(SELECT 1 FROM nodes AS c WHERE c.parent_id = p.id) as has_children FROM nodes AS p WHERE p.parent_id IS NULL',
 		params: []
+	},
+	getChildren: {
+		title: 'Get Children by Parent ID',
+		sql: 'SELECT *, EXISTS(SELECT 1 FROM nodes AS c WHERE c.parent_id = p.id) as has_children FROM nodes AS p WHERE p.parent_id = ? ORDER BY p.rank ASC, p.id ASC LIMIT ? OFFSET ?',
+		params: ['parentId', 'limit', 'offset']
+	},
+	countChildren: {
+		title: 'Count Children by Parent ID',
+		sql: 'SELECT count(*) as count FROM nodes WHERE parent_id = ?',
+		params: ['parentId']
+	},
+	getAncestors: {
+		title: 'Get all ancestors for a node',
+		sql: `
+		WITH RECURSIVE ancestors(id, parent_id, level) AS (
+			SELECT id, parent_id, 0 FROM nodes WHERE id = ?
+			UNION ALL
+			SELECT p.id, p.parent_id, a.level + 1
+			FROM nodes p, ancestors a
+			WHERE p.id = a.parent_id
+		)
+		SELECT id, parent_id FROM ancestors WHERE id != ?;
+		`,
+		params: ['nodeId', 'nodeId']
+	},
+	getVisibleTree: {
+		title: 'Get the full visible tree, with paginated children',
+		sql: `
+		WITH RECURSIVE
+			expanded_tree (id, parent_id, rank, path, level, _is_pending) AS (
+			SELECT id, parent_id, rank, printf('%020s', rank) || '::' || id, 0, _is_pending
+			FROM nodes
+			WHERE parent_id IS NULL
+
+			UNION ALL
+
+			SELECT
+				child.id,
+				child.parent_id,
+				child.rank,
+				parent.path || '/' || printf('%020s', child.rank) || '::' || child.id,
+				parent.level + 1,
+				child._is_pending
+			FROM nodes AS child
+			JOIN expanded_tree AS parent ON child.parent_id = parent.id
+			WHERE parent.id IN (SELECT value FROM json_each(?)) -- expanded_nodes_json_array
+		),
+		numbered_children AS (
+			SELECT
+				*,
+				ROW_NUMBER() OVER(PARTITION BY parent_id ORDER BY rank, id) as rn
+			FROM expanded_tree
+		)
+		SELECT nc.id, nc.parent_id, nc.level, nc._is_pending, EXISTS(SELECT 1 FROM nodes AS c WHERE c.parent_id = nc.id) as has_children,
+		(SELECT count(*) FROM nodes c WHERE c.parent_id = nc.id) as children_count
+		FROM numbered_children nc
+		WHERE
+			nc.parent_id IS NULL
+			OR nc.rn <= CAST(json_extract(?, '$.' || nc.parent_id) AS INTEGER)
+		ORDER BY nc.path;
+		`,
+		params: ['expandedNodesJson', 'expandedLimitsJson']
 	},
 	getVisibleNodes: {
 		title: 'Get Visible Nodes (lazy loading the tree)',
@@ -63,8 +128,8 @@ export const queries: { [key: string]: QueryDefinition } = {
 	insertNode: {
 		title: 'Insert New Node',
 		sql: `INSERT INTO nodes (id, created_at, payload, user_id, parent_id, _is_pending)
-            VALUES (?, current_timestamp, ?, ?, ?, 1)
-            RETURNING id`,
+			VALUES (?, current_timestamp, ?, ?, ?, 1)
+			RETURNING id`,
 		params: ['newNodeId', 'payload', 'userId', 'parentId'],
 		isMutation: true
 	},
@@ -77,14 +142,14 @@ export const queries: { [key: string]: QueryDefinition } = {
 	archiveNode: {
 		title: 'Archive Node',
 		sql: `
-            UPDATE nodes
-            SET archived_at = CURRENT_TIMESTAMP
-            WHERE CASE
-                WHEN ? THEN parent_id = ?
-                ELSE id = ?
-            END
-            AND archived_at IS NULL
-            RETURNING id;`,
+			UPDATE nodes
+			SET archived_at = CURRENT_TIMESTAMP
+			WHERE CASE
+				WHEN ? THEN parent_id = ?
+				ELSE id = ?
+			END
+			AND archived_at IS NULL
+			RETURNING id;`,
 		params: ['isRecursive', 'parentId', 'nodeId'],
 		isMutation: true
 	}

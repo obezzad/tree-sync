@@ -1,82 +1,130 @@
 'use client';
 
-import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
-import { TreeView } from '@/components/TreeView/TreeView';
+import { useCallback, useEffect, useState, useMemo } from 'react';
+import { TreeView, DisplayNode } from '@/components/TreeView/TreeView';
 import { Node, NodeService } from '@/library/powersync/NodeService';
-import { usePowerSync, useQuery } from '@powersync/react';
-import { useStatus } from '@powersync/react';
+import { usePowerSync, useQuery, useStatus } from '@powersync/react';
 import { AbstractPowerSyncDatabase } from '@powersync/web';
 import store from '@/stores/RootStore';
 import { observer } from 'mobx-react-lite';
 import { v5 as uuidv5 } from 'uuid';
 import { userService } from '@/library/powersync/userService';
-import { measureOnce, METRICS, registerLastSync, registerStart } from '@/utils/metrics';
 import { queries } from '@/library/powersync/queries';
 
-type NodeWithChildren = Node & { has_children: 0 | 1 };
+const CHILDREN_PAGE_SIZE = 50;
+
+type VisibleNode = Node & {
+  has_children: 0 | 1;
+  level: number;
+  children_count: number;
+  _is_pending: number;
+};
 
 const Home = observer(() => {
   const db = usePowerSync();
-  const prevSelectedNodeIdRef = useRef<string | null>(null);
-
   if (!db) throw new Error('PowerSync context not found');
 
-  const local_id = store.session?.user?.user_metadata?.local_id;
   const [nodeService] = useState(() => new NodeService(db as AbstractPowerSyncDatabase));
+
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const [nodeLimits, setNodeLimits] = useState<Record<string, number>>({});
+  const [loadingMoreNodeId, setLoadingMoreNodeId] = useState<string | null>(null);
 
-  const queryParams = useMemo(() => {
-    return [JSON.stringify(Array.from(expandedNodes))];
-  }, [expandedNodes]);
+  // Memoize query parameters
+  const expandedNodesJson = useMemo(() => JSON.stringify(Array.from(expandedNodes)), [expandedNodes]);
+  const expandedLimitsJson = useMemo(() => JSON.stringify(nodeLimits), [nodeLimits]);
 
-  const { data: loadedNodes } = useQuery<NodeWithChildren>(queries.getVisibleNodes.sql, queryParams);
-  const { data: allNodes } = useQuery(queries.countAllNodes.sql);
-  const { data: userNodes } = useQuery(queries.countUserNodes.sql, [local_id]);
-  const { data: pendingUpload } = useQuery(queries.countPendingUploads.sql);
-  const { downloadProgress, dataFlowStatus, connected, hasSynced } = useStatus();
+  const { data: visibleNodes } = useQuery<VisibleNode>(queries.getVisibleTree.sql, [
+    expandedNodesJson,
+    expandedLimitsJson
+  ]);
 
-  const handleToggleExpand = useCallback((nodeId: string) => {
-    setExpandedNodes((prev) => {
-      const next = new Set(prev);
-      if (next.has(nodeId)) {
-        next.delete(nodeId);
-      } else {
-        next.add(nodeId);
-        store.setSelectedNodeId(nodeId);
+  const displayNodes: DisplayNode[] = useMemo(() => {
+    if (!visibleNodes) return [];
+
+    const finalDisplayNodes: DisplayNode[] = visibleNodes.map((node) => ({
+      node: node,
+      level: node.level,
+      isExpanded: expandedNodes.has(node.id)
+    }));
+
+    const nodeChildrenCounts: Record<string, number> = {};
+    visibleNodes.forEach((node) => {
+      if (node.parent_id) {
+        nodeChildrenCounts[node.parent_id] = (nodeChildrenCounts[node.parent_id] || 0) + 1;
       }
-      return next;
     });
-  }, []);
 
-  useEffect(() => {
-    if (store.selectedNodeId && store.selectedNodeId !== prevSelectedNodeIdRef.current) {
-      if (!expandedNodes.has(store.selectedNodeId)) {
-        const node = loadedNodes.find((n) => n.id === store.selectedNodeId);
-        if (node && node.has_children) {
-          setExpandedNodes((prev) => new Set(prev).add(node.id!));
+    for (let i = finalDisplayNodes.length - 1; i >= 0; i--) {
+      const displayNode = finalDisplayNodes[i];
+      const { node } = displayNode;
+
+      if (expandedNodes.has(node.id) && node.has_children) {
+        const loadedCount = nodeChildrenCounts[node.id] || 0;
+        if (node.children_count > loadedCount) {
+          const loadMoreNode: DisplayNode = {
+            node: { parent_id: node.id, id: `load-more-${node.id}` } as any,
+            level: displayNode.level + 1,
+            isExpanded: false,
+            isLoadMoreNode: true
+          };
+          finalDisplayNodes.splice(i + loadedCount + 1, 0, loadMoreNode);
         }
       }
     }
-    prevSelectedNodeIdRef.current = store.selectedNodeId;
-  }, [store.selectedNodeId, expandedNodes, loadedNodes]);
+    return finalDisplayNodes;
+  }, [visibleNodes, expandedNodes]);
 
-  useEffect(() => {
-    registerStart();
+  const handleToggleExpand = useCallback((nodeId: string) => {
+    const newExpanded = new Set(expandedNodes);
+    if (newExpanded.has(nodeId)) {
+      newExpanded.delete(nodeId);
+    } else {
+      newExpanded.add(nodeId);
+      // Set initial limit when expanding for the first time
+      if (!nodeLimits[nodeId]) {
+        setNodeLimits(prev => ({ ...prev, [nodeId]: CHILDREN_PAGE_SIZE }));
+      }
+    }
+    setExpandedNodes(newExpanded);
+  }, [expandedNodes, nodeLimits]);
+
+  const handleLoadMore = useCallback(async (nodeId: string) => {
+    setLoadingMoreNodeId(nodeId);
+    // The query will refetch automatically when nodeLimits changes.
+    // We can add a small delay to make the loading state more perceptible on fast connections.
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    setNodeLimits(prev => ({
+      ...prev,
+      [nodeId]: (prev[nodeId] || CHILDREN_PAGE_SIZE) + CHILDREN_PAGE_SIZE
+    }));
+    setLoadingMoreNodeId(null);
   }, []);
 
   useEffect(() => {
-    registerLastSync();
-  }, [loadedNodes]);
+    if (store.selectedNodeId && !expandedNodes.has(store.selectedNodeId)) {
+      // Simple case: if a node is selected, ensure it's expanded.
+      // The query will handle fetching the data. The user might need to scroll.
+      // A more sophisticated auto-expand to reveal logic can be added here if needed.
+      const node = visibleNodes?.find(n => n.id === store.selectedNodeId);
+      if (node?.has_children) {
+        handleToggleExpand(node.id);
+      }
+    }
+  }, [store.selectedNodeId, visibleNodes, expandedNodes, handleToggleExpand]);
+
+  // Sidebar state
+  const { data: pendingUpload } = useQuery(queries.countPendingUploads.sql);
+  const { downloadProgress, dataFlowStatus, connected, hasSynced } = useStatus();
+  const local_id = store.session?.user?.user_metadata?.local_id;
+  const { data: userNodes } = useQuery(queries.countUserNodes.sql, [local_id]);
 
   useEffect(() => {
     if (!store.selectedNodeId) {
-      store.setSelectedNodeId(uuidv5("ROOT_NODE", userService.getUserId()));
+      store.setSelectedNodeId(uuidv5('ROOT_NODE', userService.getUserId()));
     }
   }, []);
-
-  if (allNodes[0]?.count > 0) {
-    measureOnce(METRICS.TIME_TO_INTERACTION);
-  }
 
   return (
     <main className="flex h-[calc(100vh-theme(spacing.16))]">
@@ -90,42 +138,52 @@ const Home = observer(() => {
           </a>
         </div>
 
-        <div className="text-gray-600 leading-tight">User nodes: <b className="text-black">{userNodes[0]?.count ?? 0}</b></div>
-        <div className="text-gray-600 leading-tight">Selected ID: <b className="text-black truncate block">{store.selectedNodeId}</b></div>
-        <div className="text-gray-600 leading-tight">Selected nodes count: <b className="text-black">{store._syncedNodes.length}</b></div>
+        <div className="text-gray-600 leading-tight">
+          User nodes: <b className="text-black">{userNodes?.[0]?.count ?? 0}</b>
+        </div>
+        <div className="text-gray-600 leading-tight">
+          Selected ID: <b className="text-black truncate block">{store.selectedNodeId}</b>
+        </div>
+        <div className="text-gray-600 leading-tight">
+          Selected nodes count: <b className="text-black">{store._syncedNodes.length}</b>
+        </div>
         <div className="leading-tight">
-          {connected ?
-            <span className='text-green-500'>Connected to sync server</span> :
-            <span className='text-red-500'>Offline</span>}
+          {connected ? (
+            <span className="text-green-500">Connected to sync server</span>
+          ) : (
+            <span className="text-red-500">Offline</span>
+          )}
           {' • '}
-          {hasSynced ?
-            <span className='text-green-500'>Initial sync done</span> :
-            <span className='text-red-500'>Pending initial sync</span>}
+          {hasSynced ? (
+            <span className="text-green-500">Initial sync done</span>
+          ) : (
+            <span className="text-red-500">Pending initial sync</span>
+          )}
         </div>
         {dataFlowStatus.downloading && (
           <>
             <div className="text-blue-600 leading-tight">
               <div>Downloading...</div>
               <div>
-                {downloadProgress.downloadedOperations}
-                / {downloadProgress.totalOperations}
+                {downloadProgress.downloadedOperations} / {downloadProgress.totalOperations}
                 {` `} ({Math.round(downloadProgress.downloadedFraction * 10000) / 100}%)
               </div>
             </div>
           </>
         )}
-        {dataFlowStatus.uploading && <>
-          <div className="text-blue-600 leading-tight">
-            Uploading... ({pendingUpload[0]?.count ?? 0})
-          </div>
-        </>}
+        {dataFlowStatus.uploading && (
+          <>
+            <div className="text-blue-600 leading-tight">Uploading... ({pendingUpload?.[0]?.count ?? 0})</div>
+          </>
+        )}
       </aside>
       <section className="flex-1 h-full overflow-y-auto">
         <TreeView
-          nodes={loadedNodes || []}
+          nodes={displayNodes}
           nodeService={nodeService}
-          expandedNodes={expandedNodes}
           onToggleExpand={handleToggleExpand}
+          onLoadMore={handleLoadMore}
+          loadingMoreNodeId={loadingMoreNodeId}
         />
       </section>
     </main>
