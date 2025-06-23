@@ -114,8 +114,8 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>
 		const rootNodeId = uuidv5('ROOT_NODE', userService.getUserId());
 		const test: QueryDefinition = queries[key];
 
-		if (test.isMutation) {
-			console.debug(`Skipping mutation test "${key}"`);
+		if (test.isMutation || test.skipTests) {
+			console.debug(`Skipping test "${key}"`);
 			return;
 		}
 

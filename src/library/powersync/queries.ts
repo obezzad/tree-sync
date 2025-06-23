@@ -17,6 +17,7 @@ export interface QueryDefinition {
 	title: string;
 	params: QueryParam[];
 	isMutation?: boolean;
+	skipTests?: boolean;
 }
 
 export const queries: { [key: string]: QueryDefinition } = {
@@ -36,30 +37,6 @@ export const queries: { [key: string]: QueryDefinition } = {
 		title: 'Get Root Nodes',
 		sql: 'SELECT *, EXISTS(SELECT 1 FROM nodes AS c WHERE c.parent_id = p.id) as has_children FROM nodes AS p WHERE p.parent_id IS NULL',
 		params: []
-	},
-	getChildren: {
-		title: 'Get Children by Parent ID',
-		sql: 'SELECT *, EXISTS(SELECT 1 FROM nodes AS c WHERE c.parent_id = p.id) as has_children FROM nodes AS p WHERE p.parent_id = ? ORDER BY p.rank ASC, p.id ASC LIMIT ? OFFSET ?',
-		params: ['parentId', 'limit', 'offset']
-	},
-	countChildren: {
-		title: 'Count Children by Parent ID',
-		sql: 'SELECT count(*) as count FROM nodes WHERE parent_id = ?',
-		params: ['parentId']
-	},
-	getAncestors: {
-		title: 'Get all ancestors for a node',
-		sql: `
-		WITH RECURSIVE ancestors(id, parent_id, level) AS (
-			SELECT id, parent_id, 0 FROM nodes WHERE id = ?
-			UNION ALL
-			SELECT p.id, p.parent_id, a.level + 1
-			FROM nodes p, ancestors a
-			WHERE p.id = a.parent_id
-		)
-		SELECT id, parent_id FROM ancestors WHERE id != ?;
-		`,
-		params: ['nodeId', 'nodeId']
 	},
 	getVisibleTree: {
 		title: 'Get the full visible tree, with paginated children',
@@ -97,17 +74,7 @@ export const queries: { [key: string]: QueryDefinition } = {
 			OR nc.rn <= CAST(json_extract(?, '$.' || nc.parent_id) AS INTEGER)
 		ORDER BY nc.path;
 		`,
-		params: ['expandedNodesJson', 'expandedLimitsJson']
-	},
-	getVisibleNodes: {
-		title: 'Get Visible Nodes (lazy loading the tree)',
-		sql: `
-		SELECT *, EXISTS(SELECT 1 FROM nodes AS c WHERE c.parent_id = p.id) as has_children
-		FROM nodes AS p
-		WHERE p.parent_id IS NULL OR p.parent_id IN (SELECT value FROM json_each(?))
-		ORDER BY p.archived_at ASC, p.id ASC
-		`,
-		params: ['expandedNodesJson']
+		params: ['expandedNodesJson', 'expandedLimitsJson'],
 	},
 	countAllNodes: {
 		title: 'Count All Nodes',

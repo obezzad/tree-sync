@@ -9,7 +9,7 @@ import { SimplePerfTest, SimplePerfTestRef, TestResult } from '@/components/Simp
 import { queries } from '@/library/powersync/queries';
 
 const useQueryBenchmarkQueries = Object.entries(queries).filter(
-	([, query]) => !query.isMutation && (query.params.length === 0 || (query.params.length === 1 && query.params.includes('userId')))
+	([, query]) => !query.isMutation && !query.skipTests && (query.params.length === 0 || (query.params.length === 1 && query.params.includes('userId')))
 ).reduce((acc, [key, query]) => {
 	acc[key] = {
 		query,
