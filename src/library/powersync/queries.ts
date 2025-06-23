@@ -59,11 +59,6 @@ export const queries: { [key: string]: QueryDefinition } = {
 		sql: 'select count(distinct tx_id) as count from ps_crud',
 		params: []
 	},
-	countOplogBuckets: {
-		title: 'Count Oplog Buckets',
-		sql: `SELECT count(DISTINCT bucket) as bucket_count FROM ps_oplog`,
-		params: []
-	},
 	// Mutations
 	insertNode: {
 		title: 'Insert New Node',

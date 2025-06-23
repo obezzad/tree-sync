@@ -30,7 +30,6 @@ const Home = observer(() => {
   const { data: loadedNodes } = useQuery<Node>(queries.getVisibleNodes.sql, queryParams);
   const { data: allNodes } = useQuery(queries.countAllNodes.sql);
   const { data: userNodes } = useQuery(queries.countUserNodes.sql, [local_id]);
-  const { data: buckets } = useQuery(queries.countOplogBuckets.sql);
   const { data: pendingUpload } = useQuery(queries.countPendingUploads.sql);
   const { downloadProgress, dataFlowStatus, connected, hasSynced } = useStatus();
 
@@ -89,7 +88,6 @@ const Home = observer(() => {
           </a>
         </div>
 
-        <div className="text-gray-600 leading-tight">User's buckets: <b className="text-black">{buckets[0]?.bucket_count ?? 0}</b></div>
         <div className="text-gray-600 leading-tight">User nodes: <b className="text-black">{userNodes[0]?.count ?? 0}</b></div>
         <div className="text-gray-600 leading-tight">Selected ID: <b className="text-black truncate block">{store.selectedNodeId}</b></div>
         <div className="text-gray-600 leading-tight">Selected nodes count: <b className="text-black">{store._syncedNodes.length}</b></div>
