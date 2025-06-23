@@ -218,17 +218,6 @@ export const TreeView = observer(({ nodes, nodeService, readOnly = false, expand
   return (
     <ErrorBoundary>
       <div className="w-full max-w-3xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200">
-      <div className="p-2 border-b border-gray-200 flex justify-end items-center">
-        <div className="flex gap-2">
-          <button
-            onClick={() => rootStore.setShowArchivedNodes(!rootStore.showArchivedNodes)}
-            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 bg-gray-100 rounded flex items-center gap-1"
-          >
-            <Archive className="w-4 h-4" />
-            {rootStore.showArchivedNodes ? 'Hide Archived' : 'Show Archived'}
-          </button>
-        </div>
-      </div>
       <div className="overflow-x-auto" style={{ height: '80vh' }}>
           {nodes.length === 0 ? (
             <div className="text-center text-gray-500 p-4">

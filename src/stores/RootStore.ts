@@ -13,8 +13,7 @@ const STORAGE_KEYS = {
   SEED: 'tree-sync-seed',
   SESSION: 'tree-sync-session',
   STATE: 'tree-sync-state',
-  OFFLINE_MODE: 'tree-sync-offline-mode',
-  SHOW_ARCHIVED: 'tree-sync-show-archived'
+  OFFLINE_MODE: 'tree-sync-offline-mode'
 } as const;
 
 interface PersistedState {
@@ -22,7 +21,6 @@ interface PersistedState {
   isAuthReady: boolean;
   isInitializing: boolean;
   isOfflineMode: boolean;
-  showArchivedNodes: boolean;
   _syncedNodes?: string[];
 }
 
@@ -34,7 +32,6 @@ export class RootStore {
   isPowerSyncReady = false;
   isAuthReady = false;
   isOfflineMode = false;
-  showArchivedNodes = true;
   selectedNodeId: string | null = null;
   _syncedNodes: string[] = [];
 
@@ -124,13 +121,6 @@ export class RootStore {
       });
     }
 
-    const storedShowArchived = localStorage.getItem(STORAGE_KEYS.SHOW_ARCHIVED);
-    if (storedShowArchived) {
-      runInAction(() => {
-        this.showArchivedNodes = storedShowArchived === 'true';
-      });
-    }
-
     this.restoreSession();
 
     this.connectDb();
@@ -166,7 +156,6 @@ export class RootStore {
       isAuthReady: this.isAuthReady,
       isInitializing: this.isInitializing,
       isOfflineMode: this.isOfflineMode,
-      showArchivedNodes: this.showArchivedNodes,
       _syncedNodes: this._syncedNodes
     };
 
@@ -184,7 +173,6 @@ export class RootStore {
           this.isAuthReady = state.isAuthReady;
           this.isInitializing = state.isInitializing;
           this.isOfflineMode = state.isOfflineMode;
-          this.showArchivedNodes = state.showArchivedNodes;
           this._syncedNodes = state._syncedNodes || [];
         });
       }
@@ -257,14 +245,6 @@ export class RootStore {
         await this.logout();
       }
     }
-  }
-
-  setShowArchivedNodes(show: boolean) {
-    runInAction(() => {
-      this.showArchivedNodes = show;
-      localStorage.setItem(STORAGE_KEYS.SHOW_ARCHIVED, show.toString());
-      this.persistState();
-    });
   }
 
   setSelectedNodeId(nodeId: string | null) {
