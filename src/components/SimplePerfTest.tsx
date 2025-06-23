@@ -123,7 +123,7 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>
 		let sampleNodeIds: string[] = [];
 
 		const needsSampleNodeId = test.params.includes('nodeId') || test.params.includes('focusedNodeId');
-		const needsSampleNodes = needsSampleNodeId || test.params.includes('expandedNodesJson');
+		const needsSampleNodes = needsSampleNodeId || test.params.includes('expandedNodesJson') || test.params.includes('expandedLimitsJson');
 
 		if (needsSampleNodes) {
 			const sampleNodesResult = await db.execute(queries.getSampleNodes.sql, [local_id]);
@@ -157,6 +157,21 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>
 						return false;
 					case 'expandedNodesJson':
 						return JSON.stringify(sampleNodeIds);
+					case 'expandedLimitsJson': {
+						const expandedLimits: { [key: string]: number } = {};
+						if (sampleNodeIds.length > 0) {
+							sampleNodeIds.forEach((id, index) => {
+								if (index < 5) {
+									expandedLimits[id] = 100;
+								} else if (index < 10) {
+									expandedLimits[id] = 500;
+								} else {
+									expandedLimits[id] = 1000;
+								}
+							});
+						}
+						return JSON.stringify(expandedLimits);
+					}
 					default:
 						return null;
 				}
