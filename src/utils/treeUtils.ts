@@ -12,6 +12,8 @@ const nouns = [
   'Ocean', 'Forest', 'Mountain', 'Valley', 'Garden'
 ];
 
+export const CHILDREN_PAGE_SIZE = 50;
+
 export const treeUtils: TreeUtils = {
   generateReadableName: () => {
     const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];

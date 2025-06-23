@@ -10,8 +10,7 @@ import { observer } from 'mobx-react-lite';
 import { v5 as uuidv5 } from 'uuid';
 import { userService } from '@/library/powersync/userService';
 import { queries } from '@/library/powersync/queries';
-
-const CHILDREN_PAGE_SIZE = 50;
+import { CHILDREN_PAGE_SIZE } from '@/utils/treeUtils';
 
 type VisibleNode = Node & {
   has_children: 0 | 1;
@@ -59,7 +58,7 @@ const Home = observer(() => {
       const displayNode = finalDisplayNodes[i];
       const { node } = displayNode;
 
-      if (expandedNodes.has(node.id) && node.has_children) {
+      if ((displayNode.level === 0 || expandedNodes.has(node.id)) && node.has_children) {
         const loadedCount = nodeChildrenCounts[node.id] || 0;
         if (node.children_count > loadedCount) {
           const loadMoreNode: DisplayNode = {

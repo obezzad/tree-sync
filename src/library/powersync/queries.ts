@@ -1,3 +1,5 @@
+import { CHILDREN_PAGE_SIZE } from '@/utils/treeUtils';
+
 export type QueryParam =
 	| 'userId'
 	| 'rootNodeId'
@@ -58,7 +60,7 @@ export const queries: { [key: string]: QueryDefinition } = {
 				child._is_pending
 			FROM nodes AS child
 			JOIN expanded_tree AS parent ON child.parent_id = parent.id
-			WHERE parent.id IN (SELECT value FROM json_each(?)) -- expanded_nodes_json_array
+			WHERE parent.level = 0 OR parent.id IN (SELECT value FROM json_each(?)) -- expanded_nodes_json_array
 		),
 		numbered_children AS (
 			SELECT
@@ -71,7 +73,7 @@ export const queries: { [key: string]: QueryDefinition } = {
 		FROM numbered_children nc
 		WHERE
 			nc.parent_id IS NULL
-			OR nc.rn <= CAST(json_extract(?, '$.' || nc.parent_id) AS INTEGER)
+			OR nc.rn <= IFNULL(CAST(json_extract(?, '$.' || nc.parent_id) AS INTEGER), ${CHILDREN_PAGE_SIZE})
 		ORDER BY nc.path;
 		`,
 		params: ['expandedNodesJson', 'expandedLimitsJson'],
