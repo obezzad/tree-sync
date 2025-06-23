@@ -13,6 +13,8 @@ import { userService } from '@/library/powersync/userService';
 import { measureOnce, METRICS, registerLastSync, registerStart } from '@/utils/metrics';
 import { queries } from '@/library/powersync/queries';
 
+type NodeWithChildren = Node & { has_children: 0 | 1 };
+
 const Home = observer(() => {
   const db = usePowerSync();
   const prevSelectedNodeIdRef = useRef<string | null>(null);
@@ -27,7 +29,7 @@ const Home = observer(() => {
     return [JSON.stringify(Array.from(expandedNodes))];
   }, [expandedNodes]);
 
-  const { data: loadedNodes } = useQuery<Node>(queries.getVisibleNodes.sql, queryParams);
+  const { data: loadedNodes } = useQuery<NodeWithChildren>(queries.getVisibleNodes.sql, queryParams);
   const { data: allNodes } = useQuery(queries.countAllNodes.sql);
   const { data: userNodes } = useQuery(queries.countUserNodes.sql, [local_id]);
   const { data: pendingUpload } = useQuery(queries.countPendingUploads.sql);

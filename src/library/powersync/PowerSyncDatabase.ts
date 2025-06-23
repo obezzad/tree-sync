@@ -1,7 +1,18 @@
-import { PowerSyncDatabase, PowerSyncDatabaseOptions, QueryResult } from '@powersync/web';
+import {
+	PowerSyncDatabase,
+	QueryResult,
+	WebPowerSyncDatabaseOptionsWithAdapter,
+	WebPowerSyncDatabaseOptionsWithOpenFactory,
+	WebPowerSyncDatabaseOptionsWithSettings
+} from '@powersync/web';
+
+export type ExtendedPowerSyncDatabaseOptions =
+	| WebPowerSyncDatabaseOptionsWithAdapter
+	| WebPowerSyncDatabaseOptionsWithOpenFactory
+	| WebPowerSyncDatabaseOptionsWithSettings;
 
 export class LoggingPowerSyncDatabase extends PowerSyncDatabase {
-	constructor(options: PowerSyncDatabaseOptions) {
+	constructor(options: ExtendedPowerSyncDatabaseOptions) {
 		super(options);
 	}
 

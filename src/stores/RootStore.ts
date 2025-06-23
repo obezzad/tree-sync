@@ -138,6 +138,7 @@ export class RootStore {
 
   private initializePowerSync() {
     this.db = new LoggingPowerSyncDatabase({
+      schema: AppSchema,
       database: new WASQLiteOpenFactory({
         dbFilename: 'powersync.db',
         vfs: WASQLiteVFS.OPFSCoopSyncVFS,
@@ -146,7 +147,6 @@ export class RootStore {
           disableSSRWarning: true,
         }
       }),
-      schema: AppSchema,
       flags: {
         enableMultiTabs: typeof SharedWorker !== 'undefined',
         disableSSRWarning: true,
