@@ -1,5 +1,5 @@
 import { makeAutoObservable, reaction, runInAction } from 'mobx';
-import { WASQLiteOpenFactory, WASQLiteVFS } from '@powersync/web';
+import { SyncClientImplementation, WASQLiteOpenFactory, WASQLiteVFS } from '@powersync/web';
 import { AppSchema } from '@/library/powersync/AppSchema';
 import backendConnector from '@/library/powersync/BackendConnector';
 import { authService } from '@/library/auth/authService';
@@ -266,7 +266,10 @@ export class RootStore {
       params.selected_nodes = [...this._syncedNodes];
     }
 
-    this.db?.connect(backendConnector, { params });
+    this.db?.connect(backendConnector, {
+      clientImplementation: SyncClientImplementation.RUST,
+      params
+    });
 
     this.db?.waitForFirstSync().then(() => {
       measureOnce(METRICS.TIME_TO_PARTIAL_REPLICATION);
