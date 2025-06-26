@@ -108,14 +108,14 @@ const UseQueryBenchmarks = observer(
 			const recordedCount = Object.values(timings).filter(t => t !== null).length;
 			if (recordedCount === Object.keys(useQueryBenchmarkQueries).length && !allTimingsRecorded.current) {
 				allTimingsRecorded.current = true;
-				console.log('=== USEQUERY TIME TO FIRST DATA ===');
+				console.debug('[PoC::PerfPage] === USEQUERY TIME TO FIRST DATA ===');
 				Object.entries(useQueryBenchmarkQueries).forEach(([key, benchmark]) => {
 					const time = timings[key];
 					if (time) {
-						console.log(`${benchmark.query.title} (${key}): ${(time! / 1000).toFixed(2)}s`);
+						console.debug(`[PoC::PerfPage] ${benchmark.query.title} (${key}): ${(time! / 1000).toFixed(2)}s`);
 					}
 				});
-				console.log('====================================');
+				console.debug('[PoC::PerfPage] ====================================');
 			}
 		}, [timings]);
 

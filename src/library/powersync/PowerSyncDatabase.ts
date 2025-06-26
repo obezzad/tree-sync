@@ -18,16 +18,16 @@ export class LoggingPowerSyncDatabase extends PowerSyncDatabase {
 
 	private logQuery(type: string, sql: string, bindingArgs?: any[]) {
 		const startTime = performance.now();
-		console.debug(`[PowerSync] ${type} START: ${sql}`, bindingArgs);
+		console.debug(`[PoC::PowerSyncDatabase] ${type} START: ${sql}`, bindingArgs);
 
 		return {
 			logEnd: (result?: any) => {
 				const duration = performance.now() - startTime;
-				console.debug(`[PowerSync] ${type} END: ${sql} (Duration: ${duration.toFixed(2)}ms)`, { bindingArgs, result });
+				console.debug(`[PoC::PowerSyncDatabase] ${type} END: ${sql} (Duration: ${duration.toFixed(2)}ms)`, { bindingArgs, result });
 			},
 			logError: (error: any) => {
 				const duration = performance.now() - startTime;
-				console.error(`[PowerSync] ${type} FAILED: ${sql} (Duration: ${duration.toFixed(2)}ms)`, {
+				console.error(`[PoC::PowerSyncDatabase] ${type} FAILED: ${sql} (Duration: ${duration.toFixed(2)}ms)`, {
 					bindingArgs,
 					error
 				});

@@ -47,7 +47,7 @@ export class NodeService {
   }
 
   async moveNode(nodeId: string, newParentId: string | null) {
-    console.log('[NodeService] moveNode →', { nodeId, newParentId });
+    console.debug('[PoC::NodeService] moveNode →', { nodeId, newParentId });
     await this.activeMutationStore.mutate({
       name: 'move_node',
       args: {
@@ -63,7 +63,7 @@ export class NodeService {
         return updateResult.rows?._array.map(row => row.id) ?? [];
       }
     });
-    console.log('[NodeService] moveNode DONE');
+    console.debug('[PoC::NodeService] moveNode DONE');
 
     return newParentId;
   }

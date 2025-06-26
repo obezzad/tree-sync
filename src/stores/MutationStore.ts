@@ -17,36 +17,36 @@ export class MutationStore {
   }
 
   async mutate(config: MutatorConfig): Promise<string[]> {
-    console.debug(`[MutationStore] mutate START ${config.name}`, config.args);
+    console.debug(`[PoC::MutationStore] mutate START ${config.name}`, config.args);
     const start = Date.now();
 
-    console.debug(`[MutationStore] waiting for writeTransaction lock for ${config.name}`);
+    console.debug(`[PoC::MutationStore] waiting for writeTransaction lock for ${config.name}`);
     let affectedNodeIds: string[] = [];
 
     const writeTx = async (tx: Transaction) => {
-      console.debug(`[MutationStore] writeTransaction callback START ${config.name}`);
+      console.debug(`[PoC::MutationStore] writeTransaction callback START ${config.name}`);
       affectedNodeIds = await config.optimisticUpdate(tx);
-      console.debug(`[MutationStore] optimisticUpdate done for ${config.name}`, affectedNodeIds);
+      console.debug(`[PoC::MutationStore] optimisticUpdate done for ${config.name}`, affectedNodeIds);
 
       if (affectedNodeIds.length > 0) {
-        console.debug(`[MutationStore] executing _is_pending update for ${config.name}`, affectedNodeIds);
+        console.debug(`[PoC::MutationStore] executing _is_pending update for ${config.name}`, affectedNodeIds);
         await tx.execute(
           `UPDATE nodes SET _is_pending = 1 WHERE id IN (${affectedNodeIds.map(() => '?').join(',')})`,
           affectedNodeIds
         );
-        console.debug(`[MutationStore] _is_pending update done for ${config.name}`);
+        console.debug(`[PoC::MutationStore] _is_pending update done for ${config.name}`);
       }
 
-      console.debug(`[MutationStore] inserting mutation row for ${config.name}`);
+      console.debug(`[PoC::MutationStore] inserting mutation row for ${config.name}`);
       await tx.execute(
         `INSERT INTO mutations (id, name, args, created_at)
          VALUES (uuid(), ?, ?, current_timestamp)`,
         [config.name, JSON.stringify(config.args)]
       );
-      console.debug(`[MutationStore] mutation row inserted for ${config.name}`);
+      console.debug(`[PoC::MutationStore] mutation row inserted for ${config.name}`);
 
       timestamp(`PUSH ${config.name}`);
-      console.debug(`[MutationStore] writeTransaction callback END ${config.name}`);
+      console.debug(`[PoC::MutationStore] writeTransaction callback END ${config.name}`);
     };
 
     // HACK: Use no wait for move_node to avoid long lock waits
@@ -57,8 +57,8 @@ export class MutationStore {
       await this.db.writeTransaction(writeTx);
     }
 
-    console.debug(`[MutationStore] writeTransaction resolved ${config.name} in ${Date.now() - start}ms`);
-    console.debug(`[MutationStore] mutate END ${config.name}`, affectedNodeIds);
+    console.debug(`[PoC::MutationStore] writeTransaction resolved ${config.name} in ${Date.now() - start}ms`);
+    console.debug(`[PoC::MutationStore] mutate END ${config.name}`, affectedNodeIds);
     return affectedNodeIds;
   }
 }

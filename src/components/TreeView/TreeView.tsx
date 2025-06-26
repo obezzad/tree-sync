@@ -55,9 +55,8 @@ const LoadMoreNode = ({
   return (
     <div
       ref={ref}
-      className={`w-full h-full flex items-center select-none rounded transition-colors ${
-        isLoading ? 'cursor-default' : ''
-      }`}
+      className={`w-full h-full flex items-center select-none rounded transition-colors ${isLoading ? 'cursor-default' : ''
+        }`}
     >
       <div className="flex items-center min-h-[40px] px-2 w-full">
         <div style={{ paddingLeft: `${displayNode.level * 1.5}rem` }} className="flex-shrink-0" />
@@ -126,7 +125,7 @@ export const TreeView = observer(
 
     const handleMove = useCallback(
       async (draggedNodeId: string, dropTargetNodeId: string | null) => {
-        console.debug('👉 handleMove(', draggedNodeId, ',', dropTargetNodeId, ')');
+        console.debug('[PoC::TreeView] 👉 handleMove(', draggedNodeId, ',', dropTargetNodeId, ')');
         if (readOnly) return;
 
         const sourceNode = nodeMap.get(draggedNodeId);
@@ -143,7 +142,7 @@ export const TreeView = observer(
         }
 
         try {
-          console.debug('   calling nodeService.moveNode…');
+          console.debug('[PoC::TreeView]    calling nodeService.moveNode…');
           if (!dropTargetNodeId) {
             throw new Error('Siblings reordering is not supported yet');
           }
@@ -152,7 +151,7 @@ export const TreeView = observer(
           if (newParentId) {
             rootStore.setSelectedNodeId(newParentId);
           }
-          console.debug('   moveNode resolved');
+          console.debug('[PoC::TreeView]    moveNode resolved');
           toast.success('Node moved successfully');
         } catch (error: any) {
           console.error('Failed to move node:', error);

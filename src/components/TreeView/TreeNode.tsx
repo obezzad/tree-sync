@@ -43,14 +43,14 @@ export const TreeNode = observer(({
   const isRoot = level === 0;
 
   const handleDragStart = (e: React.DragEvent) => {
-    console.log('🔹 dragStart on', node.id);
+    console.debug('[PoC::TreeNode] 🔹 dragStart on', node.id);
     if (readOnly) return;
     e.dataTransfer.setData('text/plain', node.id);
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleDragOver = (e: React.DragEvent) => {
-    console.log('🔹 dragOver on', node.id);
+    console.debug('[PoC::TreeNode] 🔹 dragOver on', node.id);
     if (readOnly) return;
     e.preventDefault();
     e.stopPropagation();
@@ -78,7 +78,7 @@ export const TreeNode = observer(({
     } else {
       setDragOverPosition('inside');
     }
-    console.log('    dropPosition=', dragOverPosition);
+    console.debug('[PoC::TreeNode]     dropPosition=', dragOverPosition);
   };
 
   const handleDragLeave = () => {
@@ -86,7 +86,7 @@ export const TreeNode = observer(({
   };
 
   const handleDrop = (e: React.DragEvent) => {
-    console.log('🔹 drop on', node.id, 'with position=', dragOverPosition);
+    console.debug('[PoC::TreeNode] 🔹 drop on', node.id, 'with position=', dragOverPosition);
     if (readOnly) return;
     e.preventDefault();
     e.stopPropagation();
@@ -139,9 +139,9 @@ export const TreeNode = observer(({
           !isRoot ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
           'relative',
           node._is_pending ? 'bg-yellow-100' :
-          node.archived_at ? 'bg-gray-50' :
-          isSelected ? 'bg-blue-300' :
-          wasSelected ? 'bg-blue-100' : 'hover:bg-gray-100',
+            node.archived_at ? 'bg-gray-50' :
+              isSelected ? 'bg-blue-300' :
+                wasSelected ? 'bg-blue-100' : 'hover:bg-gray-100',
           getDropIndicatorStyle(),
         ].join(' ')}
         onClick={(e) => {

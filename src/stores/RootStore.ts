@@ -68,8 +68,8 @@ export class RootStore {
     reaction(
       () => [this.isAuthenticated, this.isOfflineMode],
       () => {
-        console.log(
-          "%cReconnect DB",
+        console.debug(
+          "%c[PoC::RootStore] Reconnect DB",
           "color: lime"
         )
         this.connectDb();
@@ -87,14 +87,14 @@ export class RootStore {
           const hasRemovedNodes = previousNodes.some(node => !currentNodes.includes(node));
 
           if (hasNewNodes || hasRemovedNodes) {
-            console.log(
-              "%cReconnect DB with updated nodes",
+            console.debug(
+              "%c[PoC::RootStore] Reconnect DB with updated nodes",
               "color: lime"
             )
             this.connectDb();
           } else {
-            console.log(
-              "%cSkipping reconnect - nodes already selected",
+            console.debug(
+              "%c[PoC::RootStore] Skipping reconnect - nodes already selected",
               "color: orange"
             )
           }
@@ -153,7 +153,7 @@ export class RootStore {
     if (typeof window !== 'undefined' && this.db) {
       // Expose the PowerSyncDatabase for console debugging
       (window as any).__psDB = this.db;
-      console.log('[RootStore] db exposed on window.__psDB');
+      console.debug('[PoC::RootStore] db exposed on window.__psDB');
     }
   }
 
@@ -301,7 +301,7 @@ export class RootStore {
     runInAction(() => {
       this.isInitializing = true;
       this.seed = seed;
-      console.log({ seed })
+      console.debug('[PoC::RootStore] seed:', seed)
       this.session = session;
       localStorage.setItem(STORAGE_KEYS.SEED, seed);
       this._syncedNodes = [uuidv5("ROOT_NODE", uuidv5(seed, NAMESPACE))];

@@ -115,7 +115,7 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>
 		const test: QueryDefinition = queries[key];
 
 		if (test.isMutation || test.skipTests) {
-			console.debug(`Skipping test "${key}"`);
+			console.debug(`[PoC::SimplePerfTest] Skipping test "${key}"`);
 			return;
 		}
 
@@ -132,7 +132,7 @@ export const SimplePerfTest = forwardRef<SimplePerfTestRef, SimplePerfTestProps>
 		}
 
 		if (needsSampleNodeId && !sampleNodeId) {
-			console.log(`Skipping test "${test.title}" due to missing sample node.`);
+			console.debug(`[PoC::SimplePerfTest] Skipping test "${test.title}" due to missing sample node.`);
 			return;
 		}
 

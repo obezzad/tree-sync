@@ -17,8 +17,8 @@ export function measureOnce(name: string) {
   measurements.add(name)
   const end = performance.now()
 
-  console.log(
-    `%c[${name.toUpperCase()}] Took ${end - init}ms.`,
+  console.debug(
+    `%c[PoC::Metrics] ${name.toUpperCase()} took ${end - init}ms.`,
     "color: green; font-weight: bold; font-size: 12px;")
 }
 
@@ -27,14 +27,14 @@ export function measure(name: string) {
 
   if (end - lastSync < 30) return
 
-  console.log(
-    `%c[${name.toUpperCase()}] Took ${end - lastSync}ms.`,
+  console.debug(
+    `%c[PoC::Metrics] ${name.toUpperCase()} took ${end - lastSync}ms.`,
     "color: aqua; font-weight: bold; font-size: 12px;")
 }
 
 export function timestamp(name: string) {
-  console.log(
-    `%c[${name.toUpperCase()}] Executed at ${new Date().toISOString()}. (Date.now: ${Date.now()})`,
+  console.debug(
+    `%c[PoC::Metrics] ${name.toUpperCase()} executed at ${new Date().toISOString()}. (Date.now: ${Date.now()})`,
     "color: orange; font-weight: bold; font-size: 12px;",
   )
 }
