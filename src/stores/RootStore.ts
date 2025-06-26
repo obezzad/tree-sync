@@ -1,5 +1,6 @@
 import { makeAutoObservable, reaction, runInAction } from 'mobx';
 import { SyncClientImplementation, WASQLiteOpenFactory, WASQLiteVFS } from '@powersync/web';
+import { createBaseLogger, LogLevel } from '@powersync/common';
 import { AppSchema } from '@/library/powersync/AppSchema';
 import backendConnector from '@/library/powersync/BackendConnector';
 import { authService } from '@/library/auth/authService';
@@ -127,18 +128,24 @@ export class RootStore {
   }
 
   private initializePowerSync() {
+    // Enable debug logging for PowerSync
+    const baseLogger = createBaseLogger();
+    baseLogger.useDefaults();
+    baseLogger.setLevel(LogLevel.DEBUG);
+
     this.db = new LoggingPowerSyncDatabase({
       schema: AppSchema,
       database: new WASQLiteOpenFactory({
         dbFilename: 'powersync.db',
+        debugMode: true,
         vfs: WASQLiteVFS.OPFSCoopSyncVFS,
         flags: {
-          enableMultiTabs: typeof SharedWorker !== 'undefined',
+          enableMultiTabs: false,
           disableSSRWarning: true,
         }
       }),
       flags: {
-        enableMultiTabs: typeof SharedWorker !== 'undefined',
+        enableMultiTabs: false,
         disableSSRWarning: true,
       }
     });
